@@ -1,21 +1,23 @@
 # AI Website Builder
 
-Production-ready AI-powered website builder using Claude Agents SDK with autonomous iteration.
+AI-powered website builder that generates stunning portfolio websites from Topmate profiles using Claude/Gemini with real-time editing capabilities.
 
 ## Features
 
-- **Quick Generate**: One-click portfolio website generation
-- **Guided Interview**: Dynamic UX interview with AI-generated questions
-- **Component Editing**: Granular website edits with Playwright optimization
-- **Autonomous Refinement**: Multi-pass quality improvement (iterate until satisfied)
+- **One-Click Generation**: Generate professional portfolio websites from Topmate username
+- **5 Template Styles**: Modern Minimal, Bold Creative, Professional Corporate, Dark Elegant, Vibrant Gradient
+- **Smart Model Fallback**: Claude Sonnet 4 → Claude 3.5 Sonnet → Gemini 2.0 Flash
+- **Anti-Slop Design**: Production-grade system prompt that avoids generic AI aesthetics
+- **Real-Time Editing**: Natural language commands to modify your website
+- **Tailwind CSS v4 + Alpine.js**: Modern, responsive output with interactive components
 - **Production Ready**: Monitoring, logging, rate limiting, health checks
 
 ## Architecture
 
 ```
 ┌─────────────────┐
-│  Simple Frontend│ (Single HTML, 25KB)
-│   Port: 8080    │
+│  Simple Frontend│ (Single HTML)
+│   Port: 3000    │
 └────────┬────────┘
          │
     ┌────┴────┐
@@ -35,43 +37,98 @@ Production-ready AI-powered website builder using Claude Agents SDK with autonom
 
 ## Tech Stack
 
-- **AI Models**: Claude Opus 4.5 (primary), Gemini Flash (UX interviews)
+- **AI Models**:
+  - Primary: Claude Sonnet 4 (via OpenRouter)
+  - Fallback: Claude 3.5 Sonnet, Gemini 2.0 Flash
+  - Direct Gemini API as final fallback
 - **Backend**: Django 5.0 + FastAPI
 - **Database**: PostgreSQL 15 + Redis 7
-- **Agents**: Claude Agents SDK (autonomous iteration)
-- **Frontend**: Vanilla JS (no framework, 25KB)
+- **Frontend**: Vanilla JS (no framework)
+- **Generated Sites**: Tailwind CSS v4, Alpine.js, Google Fonts
+- **Containerization**: Docker Compose
+
+## Available Templates
+
+| Template | Description |
+|----------|-------------|
+| Modern Minimal | Clean, minimalist design with focus on content |
+| Bold & Creative | Vibrant colors and dynamic layouts |
+| Professional Corporate | Trust-building business design |
+| Dark & Elegant | Sophisticated dark theme with premium feel |
+| Vibrant Gradient | Eye-catching gradients with glass effects |
 
 ## Quick Start
 
-1. **Clone and setup environment**:
+### Prerequisites
+
+- Docker and Docker Compose
+- OpenRouter API Key (get one at [openrouter.ai](https://openrouter.ai))
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/Y4shhwanth/webisite-builder.git
+cd webisite-builder
+```
+
+### 2. Configure environment
+
 ```bash
 cp .env.example .env
 # Edit .env and add your API keys
 ```
 
-2. **Start all services**:
-```bash
-docker-compose up -d --build
+Required environment variables:
+```env
+OPENROUTER_API_KEY=your_openrouter_key
+ANTHROPIC_API_KEY=your_anthropic_key  # Optional
+GEMINI_API_KEY=your_gemini_key        # Optional
 ```
 
-3. **Run database migrations**:
+### 3. Start all services
+
+```bash
+docker compose up -d --build
+```
+
+### 4. Run database migrations
+
 ```bash
 docker exec ai_website_builder_backend python manage.py migrate
 ```
 
-4. **Open frontend**:
+### 5. Start the frontend
+
 ```bash
-open simple-frontend/index.html
+cd simple-frontend
+python3 -m http.server 3000
 ```
 
-5. **Test the system**:
-   - Enter Topmate username (e.g., "phase")
-   - Click "Quick Generate" or "Start Guided Interview"
-   - Edit generated website with natural language
+### 6. Open in browser
 
-## Development
+Navigate to http://localhost:3000
 
-### Project Structure
+## Usage
+
+1. Enter a Topmate username (e.g., "yashwanth")
+2. Select a template style (Modern Minimal, Bold Creative, etc.)
+3. Add custom instructions (optional)
+4. Click "Generate Website"
+5. Wait 30-60 seconds for AI generation
+6. Preview your website with proper sections:
+   - Navigation → Hero → About → Services → Testimonials → CTA → Footer
+7. Use Edit Mode to make changes with AI assistance
+8. Download the HTML file
+
+### Edit Commands
+
+Use natural language to edit your website:
+- "Change header to blue"
+- "Make the text bigger"
+- "Hide the testimonials section"
+- "Change background to white"
+
+## Project Structure
 
 ```
 ai-website-builder/
@@ -81,9 +138,6 @@ ai-website-builder/
 │   └── manage.py
 ├── ai_engine/           # FastAPI AI service
 │   ├── agents/          # Agent implementations
-│   │   ├── sdk_base_agent.py
-│   │   ├── orchestrator.py
-│   │   └── ...
 │   ├── mcp_tools/       # MCP tool servers
 │   ├── routers/         # API endpoints
 │   ├── services/        # Business logic
@@ -97,123 +151,62 @@ ai-website-builder/
 └── README.md
 ```
 
-### Running Tests
+## API Endpoints
+
+### AI Engine (Port 8001)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/api/build/website` | POST | Generate website from Topmate profile |
+| `/api/build/templates` | GET | List available templates |
+| `/api/edit/optimized` | POST | Edit website with AI |
+| `/api/chat/init` | POST | Initialize chat session |
+| `/api/chat/send` | POST | Send chat message for editing |
+
+### Backend (Port 8000)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health/` | GET | Health check |
+| `/api/projects/` | GET/POST | List/create projects |
+| `/api/projects/{id}/` | GET/PUT/DELETE | Project CRUD |
+
+## Health Checks
 
 ```bash
-# AI Engine tests
-docker exec ai_website_builder_ai_engine pytest tests/ -v --cov=ai_engine
-
-# Backend tests
-docker exec ai_website_builder_backend python manage.py test
-```
-
-### Health Checks
-
-```bash
-# Check all services
 curl http://localhost:8001/health  # AI Engine
 curl http://localhost:8000/health/ # Backend
 curl http://localhost:3001/health  # Playwright
 ```
 
-## Claude Agents SDK Integration
+## Development
 
-### Key Features
-
-1. **Autonomous Iteration**: Agents iterate until quality threshold met (5-8 passes)
-2. **Self-Review**: Agents read their own output and refine
-3. **Subagent Delegation**: Main orchestrator delegates to specialized agents
-4. **MCP Tool Servers**: Topmate API, File operations, DOM manipulation
-
-### Agent Workflow
-
-```
-Pass 1: Generate initial website
-Pass 2: Self-review (read output, check quality)
-Pass 3: Refine issues found
-Pass 4: Verify final output
-Pass N: Iterate until satisfied (max 8 iterations)
-```
-
-### Feature Flag
-
-Toggle between old system and new SDK agents:
+### View logs
 
 ```bash
-# In .env
-USE_SDK_AGENTS=false  # Use old system (default)
-USE_SDK_AGENTS=true   # Use new Claude Agents SDK
+docker compose logs -f           # All services
+docker compose logs -f ai_engine # Specific service
 ```
 
-## Production Deployment
-
-### Pre-Deployment Checklist
-
-- [ ] All tests passing (coverage ≥70%)
-- [ ] API keys secured (not in .env file)
-- [ ] Sentry configured for error tracking
-- [ ] Rate limiting active
-- [ ] Health checks verified
-- [ ] Resource limits set in docker-compose.yml
-- [ ] Monitoring dashboards configured
-
-### Deployment Strategy
-
-**Blue-Green Rollout**:
-1. Deploy with `USE_SDK_AGENTS=false` (old system)
-2. Monitor for 48 hours
-3. Enable SDK for 10% traffic
-4. Gradual rollout: 25% → 50% → 100%
-
-### Monitoring
-
-**Key Metrics**:
-- Latency: P50, P95, P99 generation time
-- Error Rate: Failed generations / total
-- Quality Score: Manual review sample
-- Token Usage: Cost per generation
-
-**Alerting**:
-- Error rate >5% for 5 min → Page on-call
-- Avg latency >90s for 10 min → Warning
-- Memory >80% for 15 min → Warning
-
-## API Documentation
-
-### Generate Website
+### Restart services
 
 ```bash
-POST http://localhost:8001/api/build/website
-Content-Type: application/json
-
-{
-  "username": "phase",
-  "user_prompt": "Create a modern portfolio with dark mode"
-}
+docker compose restart
 ```
 
-### Edit Website
+### Rebuild
 
 ```bash
-POST http://localhost:8001/api/edit/optimized
-Content-Type: application/json
-
-{
-  "project_id": 1,
-  "edit_instruction": "Change the header background to blue"
-}
+docker compose up -d --build
 ```
 
-### UX Interview
+### Reset database
 
 ```bash
-POST http://localhost:8001/api/interview/generate_question
-Content-Type: application/json
-
-{
-  "username": "phase",
-  "conversation_history": []
-}
+docker compose down -v
+docker compose up -d --build
+docker exec ai_website_builder_backend python manage.py migrate
 ```
 
 ## Troubleshooting
@@ -221,47 +214,36 @@ Content-Type: application/json
 ### Services won't start
 
 ```bash
-# Check logs
-docker-compose logs -f ai_engine
-
-# Restart services
-docker-compose restart
-
-# Rebuild if needed
-docker-compose up -d --build
-```
-
-### Database migrations fail
-
-```bash
-# Reset database (DESTRUCTIVE)
-docker-compose down -v
-docker-compose up -d postgres redis
-docker-compose up -d backend
-docker exec ai_website_builder_backend python manage.py migrate
+docker compose logs -f ai_engine
+docker compose restart
 ```
 
 ### Playwright not responding
 
 ```bash
-# Check if browsers installed
-docker exec ai_website_builder_playwright npx playwright --version
+docker compose up -d --build playwright
+```
 
-# Reinstall if needed
-docker-compose up -d --build playwright
+### Database issues
+
+```bash
+docker compose down -v
+docker compose up -d postgres redis
+docker compose up -d backend
+docker exec ai_website_builder_backend python manage.py migrate
 ```
 
 ## Contributing
 
-1. Create feature branch
-2. Write tests (coverage ≥70%)
-3. Ensure all tests pass
-4. Submit PR with description
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
 
 ## License
 
-Proprietary - Topmate.io
+MIT License
 
 ## Support
 
-For issues: https://github.com/topmate/ai-website-builder/issues
+For issues: https://github.com/Y4shhwanth/webisite-builder/issues
