@@ -1,0 +1,14 @@
+{
+  "name": "playwright-html-editor",
+  "version": "1.0.0",
+  "description": "Fast HTML editor using Playwright",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "playwright": "^1.40.1",
+    "redis": "^4.6.11"
+  }
+}

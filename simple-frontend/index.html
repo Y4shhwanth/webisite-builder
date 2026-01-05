@@ -1,0 +1,1718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Website Builder - Topmate</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+
+        /* ========== MAIN LAYOUT ========== */
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ========== TOP BAR ========== */
+        .top-bar {
+            height: 56px;
+            background: white;
+            border-bottom: 1px solid #e5e5e5;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 15px;
+        }
+
+        .logo {
+            font-weight: 700;
+            font-size: 18px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .top-bar-divider {
+            width: 1px;
+            height: 24px;
+            background: #e5e5e5;
+        }
+
+        .project-name {
+            font-size: 14px;
+            color: #333;
+        }
+
+        .top-bar-spacer {
+            flex: 1;
+        }
+
+        .top-bar-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: #666;
+        }
+
+        .btn-ghost:hover {
+            background: #f0f0f0;
+        }
+
+        .btn-outline {
+            background: white;
+            color: #667eea;
+            border: 1px solid #667eea;
+        }
+
+        .btn-outline:hover {
+            background: #f8f9ff;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .btn-icon {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            font-size: 18px;
+        }
+
+        /* ========== CANVAS AREA ========== */
+        .canvas-area {
+            flex: 1;
+            background: #e8e8e8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            overflow: auto;
+            position: relative;
+        }
+
+        .canvas-wrapper {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 1200px;
+            height: calc(100% - 20px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .preview-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* ========== WELCOME SCREEN ========== */
+        .welcome-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .welcome-screen.hidden {
+            display: none;
+        }
+
+        .welcome-content {
+            text-align: center;
+            max-width: 500px;
+            padding: 40px;
+        }
+
+        .welcome-content h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .welcome-content p {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: #333;
+        }
+
+        .input-group input,
+        .input-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .input-group input:focus,
+        .input-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .input-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .welcome-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .welcome-actions .btn {
+            flex: 1;
+            padding: 14px;
+        }
+
+        /* ========== LOADING OVERLAY ========== */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.95);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: #666;
+            font-size: 14px;
+        }
+
+        /* ========== AI SIDEBAR ========== */
+        .ai-sidebar {
+            width: 380px;
+            background: white;
+            border-left: 1px solid #e5e5e5;
+            display: flex;
+            flex-direction: column;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            position: absolute;
+            right: 0;
+            top: 56px;
+            bottom: 0;
+            z-index: 50;
+        }
+
+        .ai-sidebar.open {
+            transform: translateX(0);
+        }
+
+        .sidebar-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e5e5e5;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .sidebar-header h3 {
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .sidebar-close {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #999;
+            padding: 4px;
+        }
+
+        .sidebar-close:hover {
+            color: #333;
+        }
+
+        /* ========== CONTEXT PANEL (Shows selected element info) ========== */
+        .context-panel {
+            padding: 16px 20px;
+            background: #f8f9ff;
+            border-bottom: 1px solid #e5e5e5;
+            display: none;
+        }
+
+        .context-panel.active {
+            display: block;
+        }
+
+        .context-label {
+            font-size: 11px;
+            color: #667eea;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .context-element {
+            font-size: 14px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .context-text {
+            font-size: 13px;
+            color: #666;
+            margin-top: 6px;
+            padding: 8px;
+            background: white;
+            border-radius: 6px;
+            max-height: 60px;
+            overflow: hidden;
+        }
+
+        /* ========== DIRECT TEXT EDIT ========== */
+        .direct-edit-section {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e5e5e5;
+        }
+
+        .direct-edit-label {
+            font-size: 11px;
+            color: #667eea;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .direct-edit-wrapper {
+            display: flex;
+            gap: 8px;
+        }
+
+        .direct-edit-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #e5e5e5;
+            border-radius: 6px;
+            font-size: 13px;
+            resize: none;
+            font-family: inherit;
+        }
+
+        .direct-edit-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .direct-edit-btn {
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .direct-edit-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        /* ========== QUICK ACTIONS ========== */
+        .quick-actions {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e5e5e5;
+        }
+
+        .quick-actions-title {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .quick-actions-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .quick-action-btn {
+            padding: 10px 12px;
+            background: #f5f5f5;
+            border: 1px solid #e5e5e5;
+            border-radius: 8px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .quick-action-btn:hover {
+            background: #e8f0ff;
+            border-color: #667eea;
+        }
+
+        .quick-action-btn .icon {
+            font-size: 14px;
+        }
+
+        /* ========== CHAT AREA ========== */
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 20px;
+        }
+
+        .chat-message {
+            margin-bottom: 12px;
+            max-width: 90%;
+        }
+
+        .chat-message.user {
+            margin-left: auto;
+        }
+
+        .chat-message-content {
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .chat-message.user .chat-message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .chat-message.assistant .chat-message-content {
+            background: #f5f5f5;
+            color: #333;
+            border-bottom-left-radius: 4px;
+        }
+
+        .chat-suggestions {
+            padding: 12px 20px;
+            border-top: 1px solid #e5e5e5;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .suggestion-chip {
+            padding: 6px 12px;
+            background: white;
+            border: 1px solid #e5e5e5;
+            border-radius: 16px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .suggestion-chip:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .chat-input-area {
+            padding: 16px 20px;
+            border-top: 1px solid #e5e5e5;
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid #e5e5e5;
+            border-radius: 8px;
+            font-size: 13px;
+            resize: none;
+            max-height: 100px;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .chat-send-btn {
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .chat-send-btn:hover {
+            opacity: 0.9;
+        }
+
+        /* ========== FLOATING AI TOOLBAR ========== */
+        .floating-toolbar {
+            position: fixed;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            padding: 6px;
+            display: none;
+            z-index: 1000;
+            animation: toolbarFadeIn 0.15s ease;
+        }
+
+        .floating-toolbar.visible {
+            display: flex;
+        }
+
+        @keyframes toolbarFadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .toolbar-btn {
+            padding: 8px 12px;
+            background: none;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            color: #555;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .toolbar-btn:hover {
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .toolbar-btn.ai-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .toolbar-btn.ai-btn:hover {
+            opacity: 0.9;
+        }
+
+        .toolbar-divider {
+            width: 1px;
+            background: #e5e5e5;
+            margin: 4px 2px;
+        }
+
+        /* ========== BLOCK SELECTION OVERLAY ========== */
+        .block-overlay {
+            position: absolute;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .block-highlight {
+            position: absolute;
+            border: 2px solid transparent;
+            transition: all 0.15s;
+            pointer-events: auto;
+            cursor: pointer;
+        }
+
+        .block-highlight:hover {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .block-highlight.selected {
+            border-color: #764ba2;
+            background: rgba(118, 75, 162, 0.08);
+        }
+
+        .block-label {
+            position: absolute;
+            top: -26px;
+            left: 0;
+            background: #667eea;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            opacity: 0;
+            transition: opacity 0.15s;
+            white-space: nowrap;
+        }
+
+        .block-highlight:hover .block-label,
+        .block-highlight.selected .block-label {
+            opacity: 1;
+        }
+
+        /* ========== INLINE EDIT INPUT ========== */
+        .inline-edit-container {
+            position: fixed;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            z-index: 1000;
+            display: none;
+            min-width: 300px;
+            max-width: 500px;
+        }
+
+        .inline-edit-container.active {
+            display: block;
+        }
+
+        .inline-edit-textarea {
+            width: 100%;
+            min-height: 60px;
+            border: 1px solid #e5e5e5;
+            border-radius: 6px;
+            padding: 10px;
+            font-size: 14px;
+            resize: vertical;
+            margin-bottom: 10px;
+        }
+
+        .inline-edit-textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .inline-edit-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .inline-edit-btn {
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            border: none;
+        }
+
+        .inline-edit-btn.cancel {
+            background: #f5f5f5;
+            color: #666;
+        }
+
+        .inline-edit-btn.save {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        /* ========== BOTTOM TOOLBAR ========== */
+        .bottom-toolbar {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            padding: 8px 12px;
+            display: none;
+            gap: 6px;
+            z-index: 100;
+        }
+
+        .bottom-toolbar.visible {
+            display: flex;
+        }
+
+        .bottom-tool-btn {
+            padding: 10px 16px;
+            background: #f5f5f5;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .bottom-tool-btn:hover {
+            background: #e8e8e8;
+        }
+
+        .bottom-tool-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        /* ========== TOAST NOTIFICATIONS ========== */
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 13px;
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .toast.visible {
+            opacity: 1;
+        }
+
+        .toast.success {
+            background: #28a745;
+        }
+
+        .toast.error {
+            background: #dc3545;
+        }
+
+        /* ========== TYPING INDICATOR ========== */
+        .typing-indicator {
+            display: inline-flex;
+            gap: 4px;
+            padding: 10px 14px;
+        }
+
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: #667eea;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="main-content">
+            <!-- Top Bar -->
+            <div class="top-bar">
+                <div class="logo">AI Website Builder</div>
+                <div class="top-bar-divider"></div>
+                <span class="project-name" id="projectName">New Website</span>
+                <div class="top-bar-spacer"></div>
+                <div class="top-bar-actions">
+                    <button class="btn btn-ghost" onclick="resetForm()">New</button>
+                    <button class="btn btn-outline" onclick="downloadHTML()">Download</button>
+                    <button class="btn btn-primary btn-icon" onclick="toggleAISidebar()" title="AI Assistant">AI</button>
+                </div>
+            </div>
+
+            <!-- Canvas Area -->
+            <div class="canvas-area">
+                <div class="canvas-wrapper">
+                    <!-- Welcome Screen -->
+                    <div class="welcome-screen" id="welcomeScreen">
+                        <div class="welcome-content">
+                            <h1>AI Website Builder</h1>
+                            <p>Create stunning portfolio websites with AI in seconds</p>
+
+                            <div class="input-group">
+                                <label>Topmate Username</label>
+                                <input type="text" id="username" placeholder="Enter your Topmate username">
+                            </div>
+
+                            <div class="input-group">
+                                <label>Custom Instructions (Optional)</label>
+                                <textarea id="userPrompt" placeholder="e.g., Modern dark theme, minimalist design"></textarea>
+                            </div>
+
+                            <div class="welcome-actions">
+                                <button class="btn btn-primary" onclick="generateWebsite()">Generate Website</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Loading Overlay -->
+                    <div class="loading-overlay" id="loadingOverlay">
+                        <div class="spinner"></div>
+                        <div class="loading-text">Creating your website...</div>
+                    </div>
+
+                    <!-- Preview Frame -->
+                    <iframe id="previewFrame" class="preview-frame"></iframe>
+
+                    <!-- Block Overlay -->
+                    <div class="block-overlay" id="blockOverlay"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Sidebar -->
+        <div class="ai-sidebar" id="aiSidebar">
+            <div class="sidebar-header">
+                <h3>AI Assistant</h3>
+                <button class="sidebar-close" onclick="toggleAISidebar()">&times;</button>
+            </div>
+
+            <!-- Context Panel (shows selected element) -->
+            <div class="context-panel" id="contextPanel">
+                <div class="context-label">Selected Element</div>
+                <div class="context-element" id="contextElement">Hero Section</div>
+                <div class="context-text" id="contextText">Welcome to my portfolio...</div>
+
+                <!-- Direct Text Edit -->
+                <div class="direct-edit-section">
+                    <div class="direct-edit-label">Edit Text</div>
+                    <div class="direct-edit-wrapper">
+                        <textarea class="direct-edit-input" id="directEditInput" placeholder="Type new text to replace..." rows="2"></textarea>
+                        <button class="direct-edit-btn" onclick="applyDirectTextEdit()">Replace</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+                <div class="quick-actions-title">Quick Actions</div>
+                <div class="quick-actions-grid">
+                    <button class="quick-action-btn" onclick="quickAction('expand')">
+                        <span class="icon">+</span> Expand
+                    </button>
+                    <button class="quick-action-btn" onclick="quickAction('condense')">
+                        <span class="icon">-</span> Condense
+                    </button>
+                    <button class="quick-action-btn" onclick="quickAction('engaging')">
+                        <span class="icon">*</span> Make Engaging
+                    </button>
+                    <button class="quick-action-btn" onclick="quickAction('fix')">
+                        <span class="icon">~</span> Fix Grammar
+                    </button>
+                    <button class="quick-action-btn" onclick="quickAction('rephrase')">
+                        <span class="icon">R</span> Rephrase
+                    </button>
+                    <button class="quick-action-btn" onclick="quickAction('polish')">
+                        <span class="icon">P</span> Polish All
+                    </button>
+                </div>
+            </div>
+
+            <!-- Chat Area -->
+            <div class="chat-area">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="chat-message assistant">
+                        <div class="chat-message-content">
+                            Hi! I'm your AI assistant. Select any element on your website and I can help you edit it, or just tell me what changes you'd like to make.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-suggestions" id="chatSuggestions">
+                    <button class="suggestion-chip" onclick="useSuggestion('Change the color scheme')">Change colors</button>
+                    <button class="suggestion-chip" onclick="useSuggestion('Make text more engaging')">Improve text</button>
+                    <button class="suggestion-chip" onclick="useSuggestion('Add a new section')">Add section</button>
+                </div>
+
+                <div class="chat-input-area">
+                    <textarea class="chat-input" id="chatInput" placeholder="Ask me to make changes..." rows="1" onkeydown="handleChatKeydown(event)"></textarea>
+                    <button class="chat-send-btn" onclick="sendChatMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating AI Toolbar -->
+    <div class="floating-toolbar" id="floatingToolbar">
+        <button class="toolbar-btn" onclick="toolbarAction('expand')">+ Expand</button>
+        <button class="toolbar-btn" onclick="toolbarAction('condense')">- Condense</button>
+        <button class="toolbar-btn" onclick="toolbarAction('engaging')">* Engaging</button>
+        <div class="toolbar-divider"></div>
+        <button class="toolbar-btn" onclick="toolbarAction('rephrase')">Rephrase</button>
+        <button class="toolbar-btn" onclick="toolbarAction('fix')">Fix</button>
+        <div class="toolbar-divider"></div>
+        <button class="toolbar-btn ai-btn" onclick="openAIEdit()">AI Edit</button>
+    </div>
+
+    <!-- Inline Edit Container -->
+    <div class="inline-edit-container" id="inlineEditContainer">
+        <textarea class="inline-edit-textarea" id="inlineEditText" placeholder="Edit text..."></textarea>
+        <div class="inline-edit-actions">
+            <button class="inline-edit-btn cancel" onclick="cancelInlineEdit()">Cancel</button>
+            <button class="inline-edit-btn save" onclick="saveInlineEdit()">Save</button>
+        </div>
+    </div>
+
+    <!-- Bottom Toolbar -->
+    <div class="bottom-toolbar" id="bottomToolbar">
+        <button class="bottom-tool-btn" id="editModeBtn" onclick="toggleEditMode()">
+            <span>Edit Mode</span>
+        </button>
+        <button class="bottom-tool-btn" onclick="undoAction()">Undo</button>
+        <button class="bottom-tool-btn" onclick="polishAll()">Polish All</button>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // ========== CONFIGURATION ==========
+        const API_BASE = 'http://localhost:8000/api';
+        const AI_BASE = 'http://localhost:8001';
+
+        // ========== STATE ==========
+        let currentHTML = '';
+        let currentUsername = '';
+        let projectId = null;
+        let chatSessionId = null;
+        let editModeEnabled = false;
+        let selectedElement = null;
+        let selectedComponent = null;
+        let components = [];
+        let htmlHistory = [];
+
+        // ========== INITIALIZATION ==========
+        document.addEventListener('DOMContentLoaded', () => {
+            setupIframeListeners();
+        });
+
+        function setupIframeListeners() {
+            const iframe = document.getElementById('previewFrame');
+
+            iframe.onload = () => {
+                if (!currentHTML) return;
+
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+
+                // Add click listener for element selection
+                iframeDoc.addEventListener('click', handleIframeClick);
+
+                // Add double-click for inline editing
+                iframeDoc.addEventListener('dblclick', handleIframeDblClick);
+
+                // Add mouseover for hover effects
+                iframeDoc.addEventListener('mouseover', handleIframeHover);
+                iframeDoc.addEventListener('mouseout', handleIframeMouseOut);
+
+                // Inject edit mode styles
+                injectEditStyles(iframeDoc);
+            };
+        }
+
+        function injectEditStyles(doc) {
+            const style = doc.createElement('style');
+            style.textContent = `
+                .ai-edit-hover {
+                    outline: 2px dashed #667eea !important;
+                    outline-offset: 2px;
+                    cursor: pointer;
+                }
+                .ai-edit-selected {
+                    outline: 2px solid #764ba2 !important;
+                    outline-offset: 2px;
+                    background: rgba(118, 75, 162, 0.05) !important;
+                }
+                .ai-editable {
+                    transition: outline 0.15s, background 0.15s;
+                }
+            `;
+            doc.head.appendChild(style);
+
+            // Mark editable elements
+            const editables = doc.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, a, button, li');
+            editables.forEach(el => el.classList.add('ai-editable'));
+        }
+
+        // ========== WEBSITE GENERATION ==========
+        async function generateWebsite() {
+            const username = document.getElementById('username').value.trim();
+            const userPrompt = document.getElementById('userPrompt').value.trim();
+
+            if (!username) {
+                showToast('Please enter a username', 'error');
+                return;
+            }
+
+            currentUsername = username;
+            document.getElementById('projectName').textContent = `${username}'s Website`;
+
+            document.getElementById('welcomeScreen').classList.add('hidden');
+            document.getElementById('loadingOverlay').classList.add('active');
+
+            try {
+                // Initialize chat session
+                chatSessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+                await fetch(`${AI_BASE}/api/chat/init`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: chatSessionId,
+                        username: username
+                    })
+                });
+
+                // Generate website
+                const response = await fetch(`${AI_BASE}/api/build/website`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: username,
+                        user_prompt: userPrompt || 'Create a professional portfolio website'
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to generate website');
+                }
+
+                const data = await response.json();
+                currentHTML = data.html;
+                htmlHistory = [currentHTML];
+
+                document.getElementById('previewFrame').srcdoc = currentHTML;
+                document.getElementById('loadingOverlay').classList.remove('active');
+                document.getElementById('bottomToolbar').classList.add('visible');
+
+                // Sync with chat session
+                await fetch(`${AI_BASE}/api/chat/apply-html`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: chatSessionId,
+                        html: currentHTML
+                    })
+                });
+
+                // Load components for overlay
+                await loadComponents();
+
+                showToast('Website generated successfully!', 'success');
+
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('loadingOverlay').classList.remove('active');
+                document.getElementById('welcomeScreen').classList.remove('hidden');
+                showToast(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // ========== COMPONENT LOADING ==========
+        async function loadComponents() {
+            if (!currentHTML) return;
+
+            try {
+                const response = await fetch(`${AI_BASE}/api/component/identify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        html: currentHTML,
+                        include_text: true,
+                        include_bounds: true
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    components = data.components;
+                }
+            } catch (error) {
+                console.error('Failed to load components:', error);
+            }
+        }
+
+        // ========== IFRAME EVENT HANDLERS ==========
+        function handleIframeClick(e) {
+            if (!editModeEnabled) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            const iframe = document.getElementById('previewFrame');
+            const iframeDoc = iframe.contentDocument;
+
+            // Clear previous selection
+            iframeDoc.querySelectorAll('.ai-edit-selected').forEach(el => {
+                el.classList.remove('ai-edit-selected');
+            });
+
+            // Select clicked element
+            const target = e.target;
+            target.classList.add('ai-edit-selected');
+            selectedElement = target;
+
+            // Update context panel
+            updateContextPanel(target);
+
+            // Show floating toolbar
+            showFloatingToolbar(e);
+        }
+
+        function handleIframeDblClick(e) {
+            if (!editModeEnabled) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            const target = e.target;
+            if (isEditableElement(target)) {
+                openInlineEdit(target, e);
+            }
+        }
+
+        function handleIframeHover(e) {
+            if (!editModeEnabled) return;
+
+            const target = e.target;
+            if (isEditableElement(target) && !target.classList.contains('ai-edit-selected')) {
+                target.classList.add('ai-edit-hover');
+            }
+        }
+
+        function handleIframeMouseOut(e) {
+            const target = e.target;
+            target.classList.remove('ai-edit-hover');
+        }
+
+        function isEditableElement(el) {
+            const editableTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'SPAN', 'A', 'BUTTON', 'LI', 'DIV', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER'];
+            return editableTags.includes(el.tagName);
+        }
+
+        // ========== CONTEXT PANEL ==========
+        function updateContextPanel(element) {
+            const panel = document.getElementById('contextPanel');
+            const elementName = document.getElementById('contextElement');
+            const elementText = document.getElementById('contextText');
+
+            panel.classList.add('active');
+
+            // Determine element name
+            let name = element.tagName.toLowerCase();
+            if (element.id) name = `#${element.id}`;
+            else if (element.className) name = `.${element.className.split(' ')[0]}`;
+
+            elementName.textContent = name;
+            elementText.textContent = element.textContent?.substring(0, 100) || '';
+
+            selectedComponent = {
+                element: element,
+                selector: getSelector(element),
+                text: element.textContent
+            };
+
+            // Open sidebar if not open
+            if (!document.getElementById('aiSidebar').classList.contains('open')) {
+                toggleAISidebar();
+            }
+        }
+
+        function getSelector(element) {
+            if (element.id) return `#${element.id}`;
+            if (element.className) {
+                const classes = element.className.split(' ').filter(c => !c.startsWith('ai-'));
+                if (classes.length) return `${element.tagName.toLowerCase()}.${classes[0]}`;
+            }
+            return element.tagName.toLowerCase();
+        }
+
+        // ========== FLOATING TOOLBAR ==========
+        function showFloatingToolbar(e) {
+            const toolbar = document.getElementById('floatingToolbar');
+            const iframe = document.getElementById('previewFrame');
+            const iframeRect = iframe.getBoundingClientRect();
+
+            // Position toolbar above the clicked element
+            const x = iframeRect.left + e.clientX;
+            const y = iframeRect.top + e.clientY - 50;
+
+            toolbar.style.left = `${Math.max(10, Math.min(x - 150, window.innerWidth - 400))}px`;
+            toolbar.style.top = `${Math.max(10, y)}px`;
+            toolbar.classList.add('visible');
+        }
+
+        function hideFloatingToolbar() {
+            document.getElementById('floatingToolbar').classList.remove('visible');
+        }
+
+        // ========== INLINE EDITING ==========
+        function openInlineEdit(element, e) {
+            const container = document.getElementById('inlineEditContainer');
+            const textarea = document.getElementById('inlineEditText');
+            const iframe = document.getElementById('previewFrame');
+            const iframeRect = iframe.getBoundingClientRect();
+
+            textarea.value = element.textContent;
+
+            const x = iframeRect.left + e.clientX;
+            const y = iframeRect.top + e.clientY + 20;
+
+            container.style.left = `${Math.max(10, Math.min(x - 150, window.innerWidth - 350))}px`;
+            container.style.top = `${Math.max(10, y)}px`;
+            container.classList.add('active');
+
+            textarea.focus();
+            textarea.select();
+
+            hideFloatingToolbar();
+        }
+
+        function cancelInlineEdit() {
+            document.getElementById('inlineEditContainer').classList.remove('active');
+        }
+
+        async function saveInlineEdit() {
+            const newText = document.getElementById('inlineEditText').value;
+
+            if (selectedElement && newText) {
+                // Save to history
+                htmlHistory.push(currentHTML);
+
+                // Update element
+                selectedElement.textContent = newText;
+
+                // Get updated HTML
+                const iframe = document.getElementById('previewFrame');
+                const iframeDoc = iframe.contentDocument;
+                currentHTML = '<!DOCTYPE html>' + iframeDoc.documentElement.outerHTML;
+
+                // Sync with backend
+                await syncHTML();
+
+                showToast('Text updated', 'success');
+            }
+
+            cancelInlineEdit();
+        }
+
+        // ========== DIRECT TEXT EDIT ==========
+        async function applyDirectTextEdit() {
+            const input = document.getElementById('directEditInput');
+            const newText = input.value.trim();
+
+            if (!newText) {
+                showToast('Please enter text to replace', 'error');
+                return;
+            }
+
+            if (!selectedElement) {
+                showToast('Please select an element first', 'error');
+                return;
+            }
+
+            // Save to history
+            htmlHistory.push(currentHTML);
+
+            // Update the element text directly
+            selectedElement.textContent = newText;
+
+            // Get updated HTML from iframe
+            const iframe = document.getElementById('previewFrame');
+            const iframeDoc = iframe.contentDocument;
+            currentHTML = '<!DOCTYPE html>' + iframeDoc.documentElement.outerHTML;
+
+            // Sync with backend
+            await syncHTML();
+
+            // Update context panel to show new text
+            document.getElementById('contextText').textContent = newText.substring(0, 100);
+
+            // Clear input
+            input.value = '';
+
+            showToast('Text replaced successfully!', 'success');
+        }
+
+        // ========== TOOLBAR ACTIONS ==========
+        async function toolbarAction(action) {
+            if (!selectedElement || !selectedComponent) {
+                showToast('Please select an element first', 'error');
+                return;
+            }
+
+            hideFloatingToolbar();
+            showToast(`Applying ${action}...`, '');
+
+            try {
+                let instruction = '';
+                switch (action) {
+                    case 'expand':
+                        instruction = `Expand and add more detail to this text: "${selectedComponent.text}"`;
+                        break;
+                    case 'condense':
+                        instruction = `Make this text more concise: "${selectedComponent.text}"`;
+                        break;
+                    case 'engaging':
+                        instruction = `Make this text more engaging and compelling: "${selectedComponent.text}"`;
+                        break;
+                    case 'rephrase':
+                        instruction = `Rephrase this text differently: "${selectedComponent.text}"`;
+                        break;
+                    case 'fix':
+                        instruction = `Fix any grammar or spelling issues in: "${selectedComponent.text}"`;
+                        break;
+                }
+
+                const response = await fetch(`${AI_BASE}/api/edit/optimized`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        html: currentHTML,
+                        edit_instruction: `For the element "${selectedComponent.selector}": ${instruction}`
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.html) {
+                    htmlHistory.push(currentHTML);
+                    currentHTML = data.html;
+                    document.getElementById('previewFrame').srcdoc = currentHTML;
+                    await syncHTML();
+                    showToast('Edit applied!', 'success');
+                } else {
+                    showToast('Edit failed', 'error');
+                }
+            } catch (error) {
+                showToast(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // ========== QUICK ACTIONS ==========
+        async function quickAction(action) {
+            if (action === 'polish') {
+                await polishAll();
+                return;
+            }
+
+            if (!selectedComponent) {
+                showToast('Please select an element first', 'error');
+                return;
+            }
+
+            await toolbarAction(action);
+        }
+
+        async function polishAll() {
+            showToast('Polishing entire website...', '');
+
+            try {
+                const response = await fetch(`${AI_BASE}/api/edit/optimized`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        html: currentHTML,
+                        edit_instruction: 'Polish and improve the overall design: improve typography, spacing, colors, and visual hierarchy while maintaining the current structure'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.html) {
+                    htmlHistory.push(currentHTML);
+                    currentHTML = data.html;
+                    document.getElementById('previewFrame').srcdoc = currentHTML;
+                    await syncHTML();
+                    showToast('Website polished!', 'success');
+                }
+            } catch (error) {
+                showToast(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        function undoAction() {
+            if (htmlHistory.length > 1) {
+                htmlHistory.pop();
+                currentHTML = htmlHistory[htmlHistory.length - 1];
+                document.getElementById('previewFrame').srcdoc = currentHTML;
+                syncHTML();
+                showToast('Undone', 'success');
+            } else {
+                showToast('Nothing to undo', '');
+            }
+        }
+
+        // ========== EDIT MODE ==========
+        function toggleEditMode() {
+            editModeEnabled = !editModeEnabled;
+            const btn = document.getElementById('editModeBtn');
+            btn.classList.toggle('active', editModeEnabled);
+
+            if (!editModeEnabled) {
+                hideFloatingToolbar();
+                cancelInlineEdit();
+
+                // Clear selections in iframe
+                const iframe = document.getElementById('previewFrame');
+                const iframeDoc = iframe.contentDocument;
+                if (iframeDoc) {
+                    iframeDoc.querySelectorAll('.ai-edit-selected, .ai-edit-hover').forEach(el => {
+                        el.classList.remove('ai-edit-selected', 'ai-edit-hover');
+                    });
+                }
+
+                document.getElementById('contextPanel').classList.remove('active');
+            }
+
+            showToast(editModeEnabled ? 'Edit mode enabled - click elements to select' : 'Edit mode disabled', '');
+        }
+
+        // ========== AI SIDEBAR ==========
+        function toggleAISidebar() {
+            const sidebar = document.getElementById('aiSidebar');
+            sidebar.classList.toggle('open');
+        }
+
+        function openAIEdit() {
+            hideFloatingToolbar();
+            toggleAISidebar();
+
+            if (selectedComponent) {
+                document.getElementById('chatInput').value = `Edit the ${selectedComponent.selector}: `;
+                document.getElementById('chatInput').focus();
+            }
+        }
+
+        // ========== CHAT ==========
+        function handleChatKeydown(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendChatMessage();
+            }
+        }
+
+        async function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+
+            if (!message) return;
+
+            addChatMessage('user', message);
+            input.value = '';
+
+            const typingId = addChatMessage('assistant', '', true);
+
+            try {
+                const response = await fetch(`${AI_BASE}/api/chat/send`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: chatSessionId,
+                        message: message,
+                        context: {
+                            selected_component: selectedComponent?.selector,
+                            has_html: !!currentHTML
+                        }
+                    })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let assistantMessage = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                if (data.type === 'text') {
+                                    assistantMessage += data.content;
+                                    updateChatMessage(typingId, assistantMessage);
+                                } else if (data.type === 'actions') {
+                                    handleChatActions(data.items);
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                }
+
+                if (!assistantMessage) {
+                    removeChatMessage(typingId);
+                }
+
+            } catch (error) {
+                updateChatMessage(typingId, 'Sorry, I encountered an error.');
+            }
+        }
+
+        function addChatMessage(role, content, isTyping = false) {
+            const container = document.getElementById('chatMessages');
+            const messageId = 'msg-' + Date.now();
+
+            const messageEl = document.createElement('div');
+            messageEl.id = messageId;
+            messageEl.className = `chat-message ${role}`;
+
+            const contentEl = document.createElement('div');
+            contentEl.className = 'chat-message-content';
+
+            if (isTyping) {
+                contentEl.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
+            } else {
+                contentEl.innerHTML = formatMessage(content);
+            }
+
+            messageEl.appendChild(contentEl);
+            container.appendChild(messageEl);
+            container.scrollTop = container.scrollHeight;
+
+            return messageId;
+        }
+
+        function updateChatMessage(id, content) {
+            const el = document.getElementById(id);
+            if (el) {
+                el.querySelector('.chat-message-content').innerHTML = formatMessage(content);
+                document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+            }
+        }
+
+        function removeChatMessage(id) {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        }
+
+        function formatMessage(content) {
+            return content
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/\n/g, '<br>')
+                .replace(/\[ACTION:.*?\]/g, '');
+        }
+
+        function useSuggestion(text) {
+            document.getElementById('chatInput').value = text;
+            sendChatMessage();
+        }
+
+        async function handleChatActions(actions) {
+            for (const action of actions) {
+                if (action.type === 'EDIT_WEBSITE' && currentHTML) {
+                    showToast('Applying edit...', '');
+
+                    try {
+                        const response = await fetch(`${AI_BASE}/api/edit/optimized`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                html: currentHTML,
+                                edit_instruction: action.data
+                            })
+                        });
+
+                        const data = await response.json();
+
+                        if (data.html) {
+                            htmlHistory.push(currentHTML);
+                            currentHTML = data.html;
+                            document.getElementById('previewFrame').srcdoc = currentHTML;
+                            await syncHTML();
+                            showToast('Edit applied!', 'success');
+                        }
+                    } catch (error) {
+                        showToast('Edit failed', 'error');
+                    }
+                }
+            }
+        }
+
+        // ========== SYNC ==========
+        async function syncHTML() {
+            if (chatSessionId && currentHTML) {
+                try {
+                    await fetch(`${AI_BASE}/api/chat/apply-html`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            session_id: chatSessionId,
+                            html: currentHTML
+                        })
+                    });
+                } catch (e) {}
+            }
+        }
+
+        // ========== DOWNLOAD ==========
+        function downloadHTML() {
+            if (!currentHTML) {
+                showToast('No website to download', 'error');
+                return;
+            }
+
+            const blob = new Blob([currentHTML], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${currentUsername || 'website'}_portfolio.html`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast('Downloaded!', 'success');
+        }
+
+        // ========== RESET ==========
+        function resetForm() {
+            document.getElementById('welcomeScreen').classList.remove('hidden');
+            document.getElementById('bottomToolbar').classList.remove('visible');
+            document.getElementById('aiSidebar').classList.remove('open');
+            document.getElementById('username').value = '';
+            document.getElementById('userPrompt').value = '';
+            document.getElementById('previewFrame').srcdoc = '';
+            document.getElementById('projectName').textContent = 'New Website';
+
+            currentHTML = '';
+            currentUsername = '';
+            htmlHistory = [];
+            editModeEnabled = false;
+            selectedElement = null;
+            selectedComponent = null;
+
+            document.getElementById('editModeBtn').classList.remove('active');
+            document.getElementById('contextPanel').classList.remove('active');
+            hideFloatingToolbar();
+            cancelInlineEdit();
+        }
+
+        // ========== TOAST ==========
+        function showToast(message, type = '') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast visible';
+            if (type) toast.classList.add(type);
+
+            setTimeout(() => {
+                toast.classList.remove('visible');
+            }, 2500);
+        }
+
+        // ========== CLICK OUTSIDE HANDLERS ==========
+        document.addEventListener('click', (e) => {
+            const toolbar = document.getElementById('floatingToolbar');
+            const inlineEdit = document.getElementById('inlineEditContainer');
+
+            if (!toolbar.contains(e.target) && !e.target.closest('.canvas-wrapper')) {
+                hideFloatingToolbar();
+            }
+
+            if (!inlineEdit.contains(e.target) && !e.target.closest('.canvas-wrapper')) {
+                cancelInlineEdit();
+            }
+        });
+    </script>
+</body>
+</html>
