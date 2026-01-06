@@ -37,6 +37,7 @@ class BuildWebsiteResponse(BaseModel):
     template_id: Optional[str] = None
     execution_time: Optional[float] = None
     token_usage: Optional[dict] = None
+    design_context: Optional[dict] = None  # Design context for consistent edits
 
 
 class TemplateInfo(BaseModel):
@@ -145,7 +146,8 @@ async def build_website(request: Request, data: BuildWebsiteRequest):
             model=result.get("model"),
             template_id=template_id,
             execution_time=execution_time,
-            token_usage=result.get("token_usage")
+            token_usage=result.get("token_usage"),
+            design_context=result.get("design_context")
         )
 
     except HTTPException:

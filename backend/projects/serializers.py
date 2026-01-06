@@ -25,6 +25,7 @@ class WebsiteProjectSerializer(serializers.ModelSerializer):
         fields = ['id', 'user', 'name', 'description', 'topmate_username',
                   'html_content', 'status', 'interview_data', 'model_used',
                   'generation_time', 'token_usage', 'edits',
+                  'design_context', 'template_id',  # Added design context fields
                   'created_at', 'updated_at']
         read_only_fields = ['id', 'user', 'status', 'model_used',
                             'generation_time', 'token_usage',
@@ -57,11 +58,26 @@ class UpdateHTMLSerializer(serializers.Serializer):
     html = serializers.CharField(required=True)
 
 
+class SelectedElementSerializer(serializers.Serializer):
+    """Serializer for selected element context"""
+    selector = serializers.CharField(required=True)
+    tag = serializers.CharField(required=False, allow_blank=True)
+    classes = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list
+    )
+    text = serializers.CharField(required=False, allow_blank=True)
+    parent_selector = serializers.CharField(required=False, allow_blank=True)
+    attributes = serializers.DictField(required=False, default=dict)
+
+
 class EditWebsiteSerializer(serializers.Serializer):
     """Serializer for editing website"""
     edit_instruction = serializers.CharField(required=True)
     edit_type = serializers.ChoiceField(
-        choices=['simple', 'complex'],
+        choices=['simple', 'complex', 'auto'],
         required=False,
         default='auto'
     )
+    selected_element = SelectedElementSerializer(required=False, allow_null=True)

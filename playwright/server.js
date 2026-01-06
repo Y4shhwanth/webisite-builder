@@ -166,32 +166,63 @@ async function applySimpleEdit(page, instruction) {
  * Change text content
  */
 async function changeText(page, instruction) {
-    // Extract what to change and new value
-    // Example: "change header text to Welcome"
+    // Multiple patterns to extract selector and new text
+    const patterns = [
+        /change\s+(?:the\s+)?(.+?)\s+text\s+to\s+["']?(.+?)["']?$/i,
+        /change\s+["']?(.+?)["']?\s+to\s+["']?(.+?)["']?$/i,
+        /set\s+(?:the\s+)?(.+?)\s+(?:text\s+)?to\s+["']?(.+?)["']?$/i,
+        /update\s+(?:the\s+)?(.+?)\s+(?:text\s+)?to\s+["']?(.+?)["']?$/i
+    ];
 
-    const match = instruction.match(/change\s+(.+?)\s+text\s+to\s+(.+)/i);
+    let selector = null;
+    let newText = null;
 
-    if (match) {
-        const selector = match[1].toLowerCase();
-        const newText = match[2];
+    for (const pattern of patterns) {
+        const match = instruction.match(pattern);
+        if (match) {
+            selector = match[1].trim().toLowerCase();
+            newText = match[2].trim();
+            break;
+        }
+    }
 
-        // Try common selectors
-        const selectors = [
-            selector,
-            `h1:has-text("${selector}")`,
-            `.${selector}`,
-            `#${selector}`
-        ];
+    if (selector && newText) {
+        // Build list of selectors to try
+        const selectors = [];
+
+        // If it looks like a CSS selector (starts with . or #), use directly
+        if (selector.startsWith('.') || selector.startsWith('#')) {
+            selectors.push(selector);
+        } else {
+            // Try various interpretations
+            selectors.push(
+                selector,                           // Direct tag name
+                `.${selector}`,                     // Class
+                `#${selector}`,                     // ID
+                `[class*="${selector}"]`            // Partial class match
+            );
+
+            // Special handling for common terms
+            if (selector.includes('header') || selector.includes('title') || selector.includes('heading')) {
+                selectors.unshift('h1', 'h2', '.title', '.heading', 'header h1');
+            }
+            if (selector.includes('button')) {
+                selectors.unshift('button', '.btn', '[class*="button"]');
+            }
+        }
 
         for (const sel of selectors) {
             try {
-                const element = await page.$(sel);
-                if (element) {
-                    await page.evaluate((el, text) => {
-                        el.textContent = text;
-                    }, element, newText);
-                    break;
-                }
+                const changed = await page.evaluate(({ selector, text }) => {
+                    const element = document.querySelector(selector);
+                    if (element) {
+                        element.textContent = text;
+                        return true;
+                    }
+                    return false;
+                }, { selector: sel, text: newText });
+
+                if (changed) break;
             } catch (e) {
                 // Try next selector
             }
@@ -205,12 +236,46 @@ async function changeText(page, instruction) {
  * Change color
  */
 async function changeColor(page, instruction) {
-    const colorMatch = instruction.match(/(blue|red|green|yellow|black|white|gray|purple|pink|orange)/i);
+    const colorMatch = instruction.match(/(blue|red|green|yellow|black|white|gray|purple|pink|orange|#[0-9a-fA-F]{3,6})/i);
 
     if (colorMatch) {
         const color = colorMatch[1];
 
-        // Determine target element
+        // Try to extract CSS selector from instruction
+        // Patterns: "change color of .class to blue", "change a.neo-brutal color to blue"
+        const selectorPatterns = [
+            /change\s+(?:the\s+)?color\s+of\s+([.#\w-]+(?:\.[.#\w-]+)*)\s+to/i,
+            /change\s+([.#\w-]+(?:\.[.#\w-]+)*)\s+color\s+to/i,
+            /make\s+([.#\w-]+(?:\.[.#\w-]+)*)\s+(?:color\s+)?(?:be\s+)?/i,
+            /([.#][\w-]+(?:\.[\w-]+)*)\s+(?:to|should be|color)/i
+        ];
+
+        let selector = null;
+        for (const pattern of selectorPatterns) {
+            const match = instruction.match(pattern);
+            if (match && match[1]) {
+                selector = match[1];
+                break;
+            }
+        }
+
+        if (selector) {
+            // Use extracted selector
+            const changed = await page.evaluate(({ sel, c }) => {
+                const elements = document.querySelectorAll(sel);
+                if (elements.length > 0) {
+                    elements.forEach(el => el.style.color = c);
+                    return true;
+                }
+                return false;
+            }, { sel: selector, c: color });
+
+            if (changed) {
+                return await page.content();
+            }
+        }
+
+        // Fallback to keyword-based targeting
         if (instruction.includes('header')) {
             await page.evaluate((c) => {
                 const header = document.querySelector('header, h1, .header');
@@ -219,6 +284,14 @@ async function changeColor(page, instruction) {
         } else if (instruction.includes('background')) {
             await page.evaluate((c) => {
                 document.body.style.backgroundColor = c;
+            }, color);
+        } else if (instruction.includes('button')) {
+            await page.evaluate((c) => {
+                document.querySelectorAll('button, .btn, [class*="button"]').forEach(el => el.style.color = c);
+            }, color);
+        } else if (instruction.includes('link')) {
+            await page.evaluate((c) => {
+                document.querySelectorAll('a').forEach(el => el.style.color = c);
             }, color);
         } else {
             // Default: change first heading

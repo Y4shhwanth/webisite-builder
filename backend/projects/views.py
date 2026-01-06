@@ -69,7 +69,10 @@ class WebsiteProjectViewSet(viewsets.ModelViewSet):
         html_before = project.html_content
 
         try:
-            # Call AI Engine edit endpoint
+            # Get selected element from request if provided
+            selected_element = serializer.validated_data.get('selected_element')
+
+            # Call AI Engine edit endpoint with design context
             ai_engine_url = settings.AI_ENGINE_URL
             response = requests.post(
                 f"{ai_engine_url}/api/edit/optimized",
@@ -77,7 +80,9 @@ class WebsiteProjectViewSet(viewsets.ModelViewSet):
                     'project_id': project.id,
                     'html': project.html_content,
                     'edit_instruction': edit_instruction,
-                    'edit_type': edit_type
+                    'edit_type': edit_type,
+                    'design_context': project.design_context,  # Pass stored design context
+                    'selected_element': selected_element  # Pass selected element info
                 },
                 timeout=120
             )

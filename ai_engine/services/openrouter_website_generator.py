@@ -11,6 +11,7 @@ from logging_config import logger
 from config import settings
 from services.builder_system_prompt import BUILDER_SYSTEM_PROMPT
 from services.llm_response_handler import LLMResponseHandler
+from services.design_context_extractor import extract_design_context
 
 
 # Template definitions for website styles
@@ -342,6 +343,14 @@ class OpenRouterWebsiteGenerator:
             if not html_content:
                 return {"success": False, "error": "No content generated"}
 
+            # Extract design context from generated HTML
+            try:
+                design_context = extract_design_context(html_content, template_id)
+                logger.info(f"Extracted design context: fonts={design_context.get('fonts', {}).get('display')}, template={template_id}")
+            except Exception as e:
+                logger.warning(f"Failed to extract design context: {str(e)}")
+                design_context = {"template_id": template_id}
+
             execution_time = time.time() - start_time
             logger.info(f"Website generated successfully for {username} in {execution_time:.2f}s using {llm_response.provider}/{llm_response.model}")
 
@@ -351,7 +360,9 @@ class OpenRouterWebsiteGenerator:
                 "username": username,
                 "model": llm_response.model,
                 "provider": llm_response.provider,
-                "execution_time": execution_time
+                "execution_time": execution_time,
+                "design_context": design_context,
+                "template_id": template_id
             }
 
         except Exception as e:

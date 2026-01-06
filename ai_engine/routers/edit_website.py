@@ -4,7 +4,7 @@ Website editing API router with Agent-based intelligent editing.
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Dict, Any
 import time
 import httpx
 import json
@@ -19,11 +19,23 @@ router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
 
+class SelectedElement(BaseModel):
+    """Model for selected element context"""
+    selector: str
+    tag: Optional[str] = None
+    classes: Optional[List[str]] = []
+    text: Optional[str] = None
+    parent_selector: Optional[str] = None
+    attributes: Optional[Dict[str, Any]] = {}
+
+
 class EditWebsiteRequest(BaseModel):
     """Request model for editing a website"""
     html: str
     edit_instruction: str
     project_id: Optional[int] = None
+    design_context: Optional[Dict[str, Any]] = None
+    selected_element: Optional[SelectedElement] = None
 
 
 class EditWebsiteResponse(BaseModel):
@@ -87,7 +99,17 @@ async def edit_website_optimized(request: Request, data: EditWebsiteRequest):
 
         # Complex edits or Playwright fallback
         if edit_type == "complex":
-            result = await _edit_with_ai(data.html, data.edit_instruction)
+            # Convert selected_element to dict if present
+            selected_element_dict = None
+            if data.selected_element:
+                selected_element_dict = data.selected_element.model_dump()
+
+            result = await _edit_with_ai(
+                html=data.html,
+                instruction=data.edit_instruction,
+                design_context=data.design_context,
+                selected_element=selected_element_dict
+            )
 
             if not result.get("success"):
                 raise HTTPException(
@@ -122,31 +144,24 @@ def _classify_edit(instruction: str) -> str:
     """
     Classify edit as 'simple' or 'complex'.
 
-    Simple: text changes, color changes, visibility toggles
-    Complex: layout changes, new sections, structural modifications
+    Simple: Only very basic text changes
+    Complex: Everything else (colors, styles, layout, etc.) - handled by AI agent
+
+    Note: We now route most edits to the AI agent because it handles
+    Tailwind CSS classes better than the simple Playwright editor.
     """
     instruction_lower = instruction.lower()
 
+    # Only very basic edits go to Playwright
     simple_keywords = [
-        "change text", "update text", "change color", "change colour",
-        "hide", "show", "remove", "delete", "change background",
-        "change font", "make bigger", "make smaller"
+        "fix typo", "fix spelling", "correct spelling"
     ]
 
-    complex_keywords = [
-        "add section", "create", "redesign", "reorganize",
-        "change layout", "move section", "rearrange"
-    ]
-
-    # Check for complex first (more specific)
-    if any(keyword in instruction_lower for keyword in complex_keywords):
-        return "complex"
-
-    # Check for simple
+    # Everything else goes to AI agent
     if any(keyword in instruction_lower for keyword in simple_keywords):
         return "simple"
 
-    # Default to complex for safety
+    # Default to complex - AI agent handles Tailwind better
     return "complex"
 
 
@@ -177,11 +192,21 @@ async def _edit_with_playwright(html: str, instruction: str) -> dict:
         }
 
 
-async def _edit_with_ai(html: str, instruction: str) -> dict:
+async def _edit_with_ai(
+    html: str,
+    instruction: str,
+    design_context: Optional[Dict[str, Any]] = None,
+    selected_element: Optional[Dict[str, Any]] = None
+) -> dict:
     """Edit HTML using Claude AI Agent (for complex edits with tool use)"""
     try:
         # Use the editing agent with tools for intelligent editing
-        result = await edit_with_agent(html, instruction)
+        result = await edit_with_agent(
+            html=html,
+            instruction=instruction,
+            design_context=design_context,
+            selected_element=selected_element
+        )
 
         if result.get("success"):
             return {
@@ -210,6 +235,8 @@ class AgentEditRequest(BaseModel):
     html: str
     instruction: str
     max_iterations: Optional[int] = 5
+    design_context: Optional[Dict[str, Any]] = None
+    selected_element: Optional[SelectedElement] = None
 
 
 class AgentEditResponse(BaseModel):
@@ -246,11 +273,18 @@ async def edit_with_agent_endpoint(request: Request, data: AgentEditRequest):
             max_iterations=data.max_iterations
         )
 
-        # Run the editing agent
+        # Convert selected_element to dict if present
+        selected_element_dict = None
+        if data.selected_element:
+            selected_element_dict = data.selected_element.model_dump()
+
+        # Run the editing agent with design context
         result = await editing_agent.edit(
             html=data.html,
             instruction=data.instruction,
-            max_iterations=data.max_iterations
+            max_iterations=data.max_iterations,
+            design_context=data.design_context,
+            selected_element=selected_element_dict
         )
 
         execution_time = time.time() - start_time

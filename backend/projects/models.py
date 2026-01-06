@@ -27,6 +27,10 @@ class WebsiteProject(models.Model):
     # Interview data (JSON)
     interview_data = models.JSONField(default=dict, blank=True)
 
+    # Design context (fonts, colors, sections, etc.)
+    design_context = models.JSONField(default=dict, blank=True)
+    template_id = models.CharField(max_length=50, blank=True)
+
     # Generation metadata
     model_used = models.CharField(max_length=100, blank=True)
     generation_time = models.FloatField(null=True, blank=True)  # seconds

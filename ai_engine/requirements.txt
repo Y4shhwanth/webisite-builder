@@ -21,6 +21,9 @@ httpx==0.26.0
 requests==2.31.0
 aiohttp==3.9.1
 
+# HTML Parsing
+beautifulsoup4==4.12.3
+
 # Monitoring & Logging
 structlog==24.1.0
 sentry-sdk[fastapi]==1.40.0

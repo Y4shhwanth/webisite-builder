@@ -6,12 +6,17 @@ This agent can:
 - Make targeted edits using tools
 - Iterate and refine edits autonomously
 - Handle complex multi-step editing tasks
+- Maintain design consistency using design context
 """
 from typing import List, Dict, Any, Optional
 import json
 import httpx
 from logging_config import logger
 from config import settings
+from services.editing_system_prompt import (
+    build_editing_system_prompt,
+    build_user_prompt
+)
 
 
 class EditingAgent:
@@ -174,6 +179,48 @@ Always return valid, complete HTML."""
         {
             "type": "function",
             "function": {
+                "name": "modify_class",
+                "description": "Add, remove, or replace CSS classes directly in the HTML. Best for Tailwind CSS class changes. This works by string replacement and doesn't require finding elements.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "old_class": {
+                            "type": "string",
+                            "description": "The class to find and replace (e.g., 'bg-primary', 'text-red-500')"
+                        },
+                        "new_class": {
+                            "type": "string",
+                            "description": "The new class to use (e.g., 'bg-green-500', 'text-blue-500')"
+                        }
+                    },
+                    "required": ["old_class", "new_class"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "find_and_replace",
+                "description": "Find and replace text/HTML directly in the source. Use for targeted changes when selectors don't work.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "find": {
+                            "type": "string",
+                            "description": "The exact text or HTML to find"
+                        },
+                        "replace": {
+                            "type": "string",
+                            "description": "The text or HTML to replace it with"
+                        }
+                    },
+                    "required": ["find", "replace"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "finalize_edit",
                 "description": "Call this when you're done editing to return the final HTML.",
                 "parameters": {
@@ -209,7 +256,9 @@ Always return valid, complete HTML."""
         self,
         html: str,
         instruction: str,
-        max_iterations: int = 5
+        max_iterations: int = 5,
+        design_context: Optional[Dict[str, Any]] = None,
+        selected_element: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Edit HTML based on user instruction using tool-based agent.
@@ -218,33 +267,36 @@ Always return valid, complete HTML."""
             html: Current HTML content
             instruction: User's edit instruction
             max_iterations: Max tool use iterations
+            design_context: Extracted design metadata (fonts, colors, sections)
+            selected_element: Currently selected element info (selector, tag, classes)
 
         Returns:
             Edited HTML and metadata
         """
         try:
             logger.info(f"EditingAgent: Starting edit - {instruction[:50]}...")
+            if design_context:
+                logger.info(f"EditingAgent: Using design context with template: {design_context.get('template_id', 'unknown')}")
+            if selected_element:
+                logger.info(f"EditingAgent: Target element: {selected_element.get('selector', 'none')}")
+
             self.current_html = html
 
-            # Build the prompt
-            prompt = f"""Please edit this website based on the following instruction:
+            # Build context-aware system prompt
+            system_prompt = build_editing_system_prompt(
+                design_context=design_context,
+                selected_element=selected_element
+            )
 
-INSTRUCTION: {instruction}
-
-CURRENT HTML:
-```html
-{html[:50000]}
-```
-
-Use the tools to:
-1. First analyze the DOM to understand the structure
-2. Make the necessary edits
-3. Call finalize_edit with the final HTML
-
-Remember to make minimal, targeted changes."""
+            # Build user prompt with HTML
+            user_prompt = build_user_prompt(
+                instruction=instruction,
+                html=html,
+                design_context=design_context
+            )
 
             # Run agent with tools
-            messages = [{"role": "user", "content": prompt}]
+            messages = [{"role": "user", "content": user_prompt}]
             iteration = 0
             final_html = html
             edit_summary = ""
@@ -266,7 +318,7 @@ Remember to make minimal, targeted changes."""
                         json={
                             "model": self.model,
                             "messages": [
-                                {"role": "system", "content": self.SYSTEM_PROMPT},
+                                {"role": "system", "content": system_prompt},
                                 *messages
                             ],
                             "tools": self.EDITING_TOOLS,
@@ -319,7 +371,8 @@ Remember to make minimal, targeted changes."""
 
                     # Check if finalize was called
                     if tool_name == "finalize_edit":
-                        final_html = tool_input.get("html", final_html)
+                        # Use self.current_html as fallback (may have been modified by tools)
+                        final_html = tool_input.get("html") or self.current_html
                         edit_summary = tool_input.get("summary", "")
                         logger.info(f"EditingAgent: Finalized - {edit_summary}")
                         return {
@@ -400,6 +453,46 @@ Remember to make minimal, targeted changes."""
                     edit_value=tool_input.get("new_html")
                 )
 
+            elif tool_name == "modify_class":
+                # Direct string replacement for CSS classes
+                old_class = tool_input.get("old_class", "")
+                new_class = tool_input.get("new_class", "")
+                logger.info(f"EditingAgent: modify_class - '{old_class}' -> '{new_class}'")
+                if old_class and new_class:
+                    if old_class in self.current_html:
+                        modified_html = self.current_html.replace(old_class, new_class)
+                        self.current_html = modified_html
+                        logger.info(f"EditingAgent: modify_class SUCCESS")
+                        return {
+                            "success": True,
+                            "html": modified_html,
+                            "message": f"Replaced class '{old_class}' with '{new_class}'"
+                        }
+                    else:
+                        logger.info(f"EditingAgent: modify_class FAILED - class not found")
+                        return {"success": False, "error": f"Class '{old_class}' not found in HTML"}
+                return {"success": False, "error": "Missing old_class or new_class"}
+
+            elif tool_name == "find_and_replace":
+                # Direct string replacement
+                find_str = tool_input.get("find", "")
+                replace_str = tool_input.get("replace", "")
+                logger.info(f"EditingAgent: find_and_replace - finding: '{find_str[:100]}...'")
+                if find_str:
+                    if find_str in self.current_html:
+                        modified_html = self.current_html.replace(find_str, replace_str)
+                        self.current_html = modified_html
+                        logger.info(f"EditingAgent: find_and_replace SUCCESS")
+                        return {
+                            "success": True,
+                            "html": modified_html,
+                            "message": f"Replaced '{find_str[:50]}...' successfully"
+                        }
+                    else:
+                        logger.info(f"EditingAgent: find_and_replace FAILED - text not found")
+                        return {"success": False, "error": f"Text '{find_str[:50]}...' not found in HTML"}
+                return {"success": False, "error": "Missing find parameter"}
+
             elif tool_name == "finalize_edit":
                 # This is handled in the main loop
                 return {"success": True, "message": "Finalized"}
@@ -474,15 +567,27 @@ Remember to make minimal, targeted changes."""
 editing_agent = EditingAgent()
 
 
-async def edit_with_agent(html: str, instruction: str) -> Dict[str, Any]:
+async def edit_with_agent(
+    html: str,
+    instruction: str,
+    design_context: Optional[Dict[str, Any]] = None,
+    selected_element: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """
     Convenience function to edit HTML using the editing agent.
 
     Args:
         html: Current HTML
         instruction: Edit instruction
+        design_context: Extracted design metadata (fonts, colors, sections)
+        selected_element: Currently selected element info
 
     Returns:
         Edited HTML and metadata
     """
-    return await editing_agent.edit(html, instruction)
+    return await editing_agent.edit(
+        html=html,
+        instruction=instruction,
+        design_context=design_context,
+        selected_element=selected_element
+    )
