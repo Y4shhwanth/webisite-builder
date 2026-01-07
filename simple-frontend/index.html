@@ -1101,32 +1101,58 @@
 
         // ========== PREVIEW UPDATE ==========
         function updatePreviewFrame(html) {
+            console.log('updatePreviewFrame called, html length:', html?.length);
+
+            if (!html) {
+                console.error('updatePreviewFrame: No HTML provided');
+                return;
+            }
+
             const container = document.querySelector('.canvas-wrapper');
+            if (!container) {
+                console.error('updatePreviewFrame: canvas-wrapper not found');
+                return;
+            }
+
             const oldFrame = document.getElementById('previewFrame');
+            console.log('Old frame found:', !!oldFrame);
 
             // Create new iframe
             const newFrame = document.createElement('iframe');
             newFrame.id = 'previewFrame';
             newFrame.className = 'preview-frame';
-            newFrame.srcdoc = html;
 
-            // Replace old iframe
-            if (oldFrame) {
-                container.replaceChild(newFrame, oldFrame);
+            // Replace old iframe BEFORE setting srcdoc to avoid timing issues
+            if (oldFrame && oldFrame.parentNode) {
+                oldFrame.parentNode.replaceChild(newFrame, oldFrame);
+                console.log('Replaced old frame with new frame');
+            } else {
+                container.appendChild(newFrame);
+                console.log('Appended new frame to container');
             }
+
+            // Now set the srcdoc
+            newFrame.srcdoc = html;
+            console.log('Set srcdoc on new frame');
 
             // Re-setup listeners after iframe loads
             newFrame.onload = () => {
+                console.log('New iframe loaded');
                 if (!html) return;
-                const iframeDoc = newFrame.contentDocument || newFrame.contentWindow.document;
-                iframeDoc.addEventListener('click', handleIframeClick);
-                iframeDoc.addEventListener('dblclick', handleIframeDblClick);
-                iframeDoc.addEventListener('mouseover', handleIframeHover);
-                iframeDoc.addEventListener('mouseout', handleIframeMouseOut);
-                injectEditStyles(iframeDoc);
+                try {
+                    const iframeDoc = newFrame.contentDocument || newFrame.contentWindow.document;
+                    iframeDoc.addEventListener('click', handleIframeClick);
+                    iframeDoc.addEventListener('dblclick', handleIframeDblClick);
+                    iframeDoc.addEventListener('mouseover', handleIframeHover);
+                    iframeDoc.addEventListener('mouseout', handleIframeMouseOut);
+                    injectEditStyles(iframeDoc);
+                    console.log('Iframe listeners set up successfully');
+                } catch (e) {
+                    console.error('Error setting up iframe listeners:', e);
+                }
             };
 
-            console.log('Preview frame replaced with new HTML, length:', html.length);
+            console.log('Preview frame updated with HTML length:', html.length);
         }
 
         // ========== TEMPLATE SELECTION ==========
@@ -1821,6 +1847,7 @@
         async function handleChatActions(actions) {
             console.log('=== handleChatActions START ===');
             console.log('Actions received:', JSON.stringify(actions));
+            console.log('currentHTML exists:', !!currentHTML, 'length:', currentHTML?.length);
             console.log('Current HTML exists:', !!currentHTML, 'length:', currentHTML?.length);
 
             if (!actions || actions.length === 0) {
@@ -1840,6 +1867,7 @@
 
                     try {
                         console.log('Sending edit request:', action.data);
+                        console.log('Sending HTML length:', currentHTML.length);
                         const response = await fetch(`${AI_BASE}/api/edit/optimized`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -1851,19 +1879,38 @@
                             })
                         });
 
+                        console.log('Edit response status:', response.status);
                         const data = await response.json();
                         console.log('Edit response:', { success: data.success, hasHtml: !!data.html, htmlLength: data.html?.length });
+                        console.log('Edit response summary:', data.summary || 'none');
 
                         if (data.html) {
                             const htmlChanged = data.html !== currentHTML;
                             console.log('HTML changed:', htmlChanged);
                             console.log('Old HTML length:', currentHTML.length);
                             console.log('New HTML length:', data.html.length);
+
+                            // Debug: show first 500 chars diff
+                            if (htmlChanged) {
+                                for (let i = 0; i < Math.min(data.html.length, currentHTML.length); i++) {
+                                    if (data.html[i] !== currentHTML[i]) {
+                                        console.log('First diff at index:', i);
+                                        console.log('Old:', currentHTML.substring(i, i+100));
+                                        console.log('New:', data.html.substring(i, i+100));
+                                        break;
+                                    }
+                                }
+                            }
+
                             htmlHistory.push(currentHTML);
                             currentHTML = data.html;
 
                             // Force iframe refresh by replacing it
                             updatePreviewFrame(currentHTML);
+
+                            // Reset opacity (in case old frame reference still exists)
+                            const frame = document.getElementById('previewFrame');
+                            if (frame) frame.style.opacity = '1';
 
                             await syncHTML();
                             showToast(htmlChanged ? '✅ Edit applied!' : '⚠️ No changes made', htmlChanged ? 'success' : '');

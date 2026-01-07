@@ -59,7 +59,13 @@ BASE_EDITING_PROMPT = """You are an expert website editor agent. Your job is to 
 2. Use modify_class or find_and_replace to make the change
 3. ALWAYS call finalize_edit with a summary
 
-IMPORTANT: Do NOT just explain what you would do - actually DO IT using the tools!"""
+IMPORTANT: Do NOT just explain what you would do - actually DO IT using the tools!
+
+## CRITICAL - NEVER USE PLACEHOLDERS:
+- NEVER put "[Previous HTML content...]" or similar placeholders in the HTML
+- NEVER truncate the HTML - use find_and_replace or modify_class to change specific parts
+- When calling finalize_edit, you do NOT need to pass the full HTML - just pass a summary
+- The system will automatically use the modified HTML from your edit tools"""
 
 
 def build_design_constraints(design_context: dict) -> str:
@@ -177,6 +183,21 @@ EDITING_RULES = """## QUICK REFERENCE FOR COMMON EDITS
 - Text color: modify_class(old_class="text-white", new_class="text-red-500")
 - Background: modify_class(old_class="bg-primary", new_class="bg-green-500")
 - Border: modify_class(old_class="border-gray-200", new_class="border-blue-500")
+
+### IMPORTANT - Specific Color Names:
+When the user asks for a specific color like "blue", "red", "green", etc., use actual Tailwind colors:
+- "blue" → bg-blue-500, text-blue-500
+- "red" → bg-red-500, text-red-500
+- "green" → bg-green-500, text-green-500
+- "yellow" → bg-yellow-500, text-yellow-500
+- "purple" → bg-purple-500, text-purple-500
+- "pink" → bg-pink-500, text-pink-500
+- "orange" → bg-orange-500, text-orange-500
+- "cyan" → bg-cyan-500, text-cyan-500
+- "white" → bg-white, text-white
+- "black" → bg-black, text-black
+
+DO NOT substitute "primary" or "accent" when the user asks for a specific color name!
 
 ### Text Changes:
 - Use edit_text(selector="h1.title", new_text="New Title")

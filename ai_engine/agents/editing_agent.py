@@ -222,20 +222,16 @@ Always return valid, complete HTML."""
             "type": "function",
             "function": {
                 "name": "finalize_edit",
-                "description": "Call this when you're done editing to return the final HTML.",
+                "description": "Call this when you're done editing. The system will use the HTML from your previous edit tools automatically. Just provide a summary of what you changed.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "html": {
-                            "type": "string",
-                            "description": "The final edited HTML"
-                        },
                         "summary": {
                             "type": "string",
-                            "description": "Brief summary of changes made"
+                            "description": "Brief summary of changes made (e.g., 'Changed header color from blue to green')"
                         }
                     },
-                    "required": ["html", "summary"]
+                    "required": ["summary"]
                 }
             }
         }
@@ -371,10 +367,14 @@ Always return valid, complete HTML."""
 
                     # Check if finalize was called
                     if tool_name == "finalize_edit":
-                        # Use self.current_html as fallback (may have been modified by tools)
-                        final_html = tool_input.get("html") or self.current_html
-                        edit_summary = tool_input.get("summary", "")
-                        logger.info(f"EditingAgent: Finalized - {edit_summary}")
+                        # Always use self.current_html - it has been modified by previous tools
+                        # The AI should NOT pass HTML, just a summary
+                        edit_summary = tool_input.get("summary", "Edit completed")
+                        final_html = self.current_html
+
+                        logger.info(f"EditingAgent: finalize_edit called - summary: {edit_summary}")
+                        logger.info(f"EditingAgent: Using self.current_html with length: {len(final_html)}")
+
                         return {
                             "success": True,
                             "html": final_html,

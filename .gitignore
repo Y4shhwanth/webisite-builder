@@ -32,6 +32,7 @@ Thumbs.db
 # Generated files
 generated_websites/
 *.html.bak
+staticfiles/
 
 # Cache
 .cache/
