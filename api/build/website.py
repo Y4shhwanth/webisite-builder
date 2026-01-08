@@ -90,14 +90,14 @@ class handler(BaseHTTPRequestHandler):
             "Content-Type": "application/json",
         }
         payload = json.dumps({
-            "model": "anthropic/claude-sonnet-4",
+            "model": "google/gemini-2.0-flash-001",  # Fast model for Vercel
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": 8192,
             "temperature": 0.7,
         }).encode()
 
         req = urllib.request.Request(url, data=payload, headers=headers, method='POST')
-        with urllib.request.urlopen(req, timeout=120) as response:
+        with urllib.request.urlopen(req, timeout=55) as response:
             result = json.loads(response.read().decode())
             return result["choices"][0]["message"]["content"]
 
