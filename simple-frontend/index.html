@@ -1990,8 +1990,6 @@
 
         function openImageUrlEdit() {
             console.log('openImageUrlEdit called');
-            console.log('selectedElement:', selectedElement);
-            console.log('lastSelectedImage:', lastSelectedImage);
 
             // Hide image toolbar first
             const imageToolbar = document.getElementById('imageToolbar');
@@ -2001,7 +1999,6 @@
             const imageElement = selectedElement || lastSelectedImage;
 
             if (!imageElement) {
-                console.log('No image element available');
                 showToast('No image selected', 'error');
                 return;
             }
@@ -2026,28 +2023,14 @@
                 console.log('Error getting image URL:', e);
             }
 
-            console.log('Current image URL:', currentImageUrl);
+            // Use browser prompt for reliability
+            const newUrl = prompt('Enter new image URL:', currentImageUrl);
 
-            // Show the modal
-            const modal = document.getElementById('imageUrlModal');
-            const input = document.getElementById('imageUrlInput');
-
-            console.log('Modal element:', modal);
-            console.log('Input element:', input);
-
-            if (!modal) {
-                console.error('Modal not found!');
-                showToast('Error: Modal not found', 'error');
-                return;
-            }
-
-            if (input) input.value = currentImageUrl;
-            modal.style.display = 'flex';
-            console.log('Modal display set to flex');
-
-            if (input) {
-                input.focus();
-                input.select();
+            if (newUrl && newUrl.trim() && newUrl !== currentImageUrl) {
+                replaceImageUrl(newUrl.trim(), currentImageUrl);
+            } else if (newUrl === null) {
+                // User cancelled
+                console.log('User cancelled image URL edit');
             }
         }
 
