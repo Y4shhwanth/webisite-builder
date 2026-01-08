@@ -1987,7 +1987,8 @@
             console.log('openImageUrlEdit called');
 
             // Hide image toolbar first
-            document.getElementById('imageToolbar').classList.remove('visible');
+            const imageToolbar = document.getElementById('imageToolbar');
+            if (imageToolbar) imageToolbar.classList.remove('visible');
 
             if (!selectedElement) {
                 showToast('No image selected', 'error');
@@ -1996,22 +1997,44 @@
 
             // Get current image URL
             currentImageUrl = '';
-            if (selectedElement.tagName.toLowerCase() === 'img') {
-                currentImageUrl = selectedElement.src || '';
-            } else {
-                const bgImage = window.getComputedStyle(selectedElement).backgroundImage;
-                if (bgImage && bgImage !== 'none') {
-                    currentImageUrl = bgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
+            try {
+                if (selectedElement.tagName && selectedElement.tagName.toLowerCase() === 'img') {
+                    currentImageUrl = selectedElement.src || '';
+                } else {
+                    const iframe = document.getElementById('previewFrame');
+                    const iframeWindow = iframe.contentWindow;
+                    const bgImage = iframeWindow.getComputedStyle(selectedElement).backgroundImage;
+                    if (bgImage && bgImage !== 'none') {
+                        currentImageUrl = bgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
+                    }
                 }
+            } catch (e) {
+                console.log('Error getting image URL:', e);
             }
+
+            console.log('Current image URL:', currentImageUrl);
 
             // Show the modal
             const modal = document.getElementById('imageUrlModal');
             const input = document.getElementById('imageUrlInput');
-            input.value = currentImageUrl;
+
+            console.log('Modal element:', modal);
+            console.log('Input element:', input);
+
+            if (!modal) {
+                console.error('Modal not found!');
+                showToast('Error: Modal not found', 'error');
+                return;
+            }
+
+            if (input) input.value = currentImageUrl;
             modal.style.display = 'flex';
-            input.focus();
-            input.select();
+            console.log('Modal display set to flex');
+
+            if (input) {
+                input.focus();
+                input.select();
+            }
         }
 
         function closeImageModal() {
