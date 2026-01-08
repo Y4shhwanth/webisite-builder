@@ -46,6 +46,7 @@ class EditWebsiteResponse(BaseModel):
     edit_type: Optional[str] = None  # 'simple' or 'complex'
     model: Optional[str] = None
     execution_time: Optional[float] = None
+    replay_url: Optional[str] = None  # Browserbase session replay URL for debugging
 
 
 @router.post("/edit/optimized", response_model=EditWebsiteResponse)
@@ -122,7 +123,8 @@ async def edit_website_optimized(request: Request, data: EditWebsiteRequest):
             logger.info(
                 "Edit completed with AI",
                 edit_type="complex",
-                execution_time=execution_time
+                execution_time=execution_time,
+                replay_url=result.get("replay_url")
             )
 
             return EditWebsiteResponse(
@@ -130,7 +132,8 @@ async def edit_website_optimized(request: Request, data: EditWebsiteRequest):
                 html=result.get("html"),
                 edit_type="complex",
                 model=result.get("model"),
-                execution_time=execution_time
+                execution_time=execution_time,
+                replay_url=result.get("replay_url")
             )
 
     except HTTPException:

@@ -2059,28 +2059,13 @@
                 console.log('Error getting image URL:', e);
             }
 
-            // Show the modal using class toggle
-            const modal = document.getElementById('imageUrlModal');
-            const input = document.getElementById('imageUrlInput');
+            // Use browser prompt for reliability - modal has z-index issues with iframe
+            const newUrl = prompt('Enter new image URL:', currentImageUrl);
 
-            if (!modal) {
-                console.error('Modal not found, falling back to prompt');
-                const newUrl = prompt('Enter new image URL:', currentImageUrl);
-                if (newUrl && newUrl.trim() && newUrl !== currentImageUrl) {
-                    replaceImageUrl(newUrl.trim(), currentImageUrl);
+            if (newUrl && newUrl.trim()) {
+                if (newUrl.trim() !== currentImageUrl) {
+                    replaceImageUrlDirect(newUrl.trim(), currentImageUrl);
                 }
-                return;
-            }
-
-            if (input) input.value = currentImageUrl;
-            modal.classList.add('visible');
-            console.log('Modal shown with class visible');
-
-            if (input) {
-                setTimeout(() => {
-                    input.focus();
-                    input.select();
-                }, 100);
             }
         }
 
@@ -2103,21 +2088,30 @@
             }
         }
 
-        // Close modal on click outside or Escape key
-        document.getElementById('imageUrlModal').addEventListener('click', function(e) {
-            if (e.target === this) closeImageModal();
-        });
+        // Close modal on click outside or Escape key (with null checks)
+        (function() {
+            const modal = document.getElementById('imageUrlModal');
+            const input = document.getElementById('imageUrlInput');
 
-        document.getElementById('imageUrlInput').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                confirmImageUrl();
-            } else if (e.key === 'Escape') {
-                closeImageModal();
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === this) closeImageModal();
+                });
             }
-        });
 
-        async function replaceImageUrl(newUrl, oldUrl) {
+            if (input) {
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        confirmImageUrl();
+                    } else if (e.key === 'Escape') {
+                        closeImageModal();
+                    }
+                });
+            }
+        })();
+
+        async function replaceImageUrlDirect(newUrl, oldUrl) {
             // Validate URL
             try {
                 new URL(newUrl);
@@ -2129,46 +2123,92 @@
             showToast('Replacing image...', '');
             htmlHistory.push(currentHTML);
 
-            console.log('Replacing image URL');
+            console.log('Replacing image URL directly');
             console.log('Old URL:', oldUrl);
             console.log('New URL:', newUrl);
-            console.log('Selected element:', selectedElement?.tagName);
-            console.log('Selected element src:', selectedElement?.src);
 
-            // Always use AI for reliable replacement
-            try {
-                const instruction = selectedElement?.tagName?.toLowerCase() === 'img'
-                    ? `Change the src attribute of this image to "${newUrl}". The current src is "${oldUrl}". Replace it with the new URL.`
-                    : `Change the background image of this element to "${newUrl}"`;
+            let modified = false;
 
-                console.log('Sending edit instruction:', instruction);
-
-                const response = await fetch(`${AI_BASE}/api/edit/optimized`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        html: currentHTML,
-                        edit_instruction: instruction,
-                        design_context: designContext,
-                        selected_element: buildSelectedElementData()
-                    })
-                });
-
-                const data = await response.json();
-                console.log('API response:', data);
-
-                if (data.html) {
-                    currentHTML = data.html;
-                    updatePreviewFrame(currentHTML);
-                    await syncHTML();
-                    showToast('Image replaced!', 'success');
-                } else {
-                    showToast('Failed to replace image: ' + (data.error || 'Unknown error'), 'error');
-                }
-            } catch (error) {
-                console.error('Error replacing image:', error);
-                showToast(`Error: ${error.message}`, 'error');
+            // Method 1: Direct string replacement if we have the old URL
+            if (oldUrl && currentHTML.includes(oldUrl)) {
+                currentHTML = currentHTML.split(oldUrl).join(newUrl);
+                modified = true;
+                console.log('Replaced via direct string match');
             }
+
+            // Method 2: If direct replacement didn't work, try regex for src attribute
+            if (!modified && selectedElement?.tagName?.toLowerCase() === 'img') {
+                // Extract a unique identifier from the image (like alt text or class)
+                const alt = selectedElement.alt || '';
+                const className = selectedElement.className || '';
+
+                if (alt) {
+                    // Find image by alt attribute and replace src
+                    const regex = new RegExp(`(<img[^>]*alt=["']${alt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["'][^>]*src=["'])[^"']+["']`, 'gi');
+                    const newHTML = currentHTML.replace(regex, `$1${newUrl}"`);
+                    if (newHTML !== currentHTML) {
+                        currentHTML = newHTML;
+                        modified = true;
+                        console.log('Replaced via alt attribute match');
+                    }
+                }
+
+                // Also try src pattern
+                if (!modified) {
+                    const regex = new RegExp(`(<img[^>]*src=["'])[^"']+["']([^>]*alt=["']${alt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["'])`, 'gi');
+                    const newHTML = currentHTML.replace(regex, `$1${newUrl}"$2`);
+                    if (newHTML !== currentHTML) {
+                        currentHTML = newHTML;
+                        modified = true;
+                        console.log('Replaced via src+alt pattern');
+                    }
+                }
+            }
+
+            // Method 3: Last resort - use AI
+            if (!modified) {
+                console.log('Direct replacement failed, using AI');
+                try {
+                    const instruction = selectedElement?.tagName?.toLowerCase() === 'img'
+                        ? `Change the src attribute of the selected image to "${newUrl}"`
+                        : `Change the background image of this element to url("${newUrl}")`;
+
+                    const response = await fetch(`${AI_BASE}/api/edit/optimized`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            html: currentHTML,
+                            edit_instruction: instruction,
+                            design_context: designContext,
+                            selected_element: buildSelectedElementData()
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (data.html) {
+                        currentHTML = data.html;
+                        modified = true;
+                    } else {
+                        showToast('Failed to replace image', 'error');
+                        return;
+                    }
+                } catch (error) {
+                    console.error('AI replacement failed:', error);
+                    showToast('Failed to replace image', 'error');
+                    return;
+                }
+            }
+
+            if (modified) {
+                updatePreviewFrame(currentHTML);
+                await syncHTML();
+                showToast('Image replaced!', 'success');
+            }
+        }
+
+        async function replaceImageUrl(newUrl, oldUrl) {
+            // Wrapper that calls the direct method
+            await replaceImageUrlDirect(newUrl, oldUrl);
         }
 
         function cancelImageUrlEdit() {
