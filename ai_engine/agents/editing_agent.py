@@ -7,6 +7,7 @@ This agent can:
 - Iterate and refine edits autonomously
 - Handle complex multi-step editing tasks
 - Maintain design consistency using design context
+- Use Browserbase for cloud browser automation with visual verification
 """
 from typing import List, Dict, Any, Optional
 import json
@@ -17,6 +18,8 @@ from services.editing_system_prompt import (
     build_editing_system_prompt,
     build_user_prompt
 )
+from services.browserbase_service import get_browserbase_service, BrowserbaseService
+from services.visual_verification import get_visual_verification_service, VisualVerificationService
 
 
 class EditingAgent:
@@ -251,7 +254,15 @@ Always return valid, complete HTML."""
         self.max_iterations = 5
         self.temperature = 0.3
 
+        # Browserbase integration (cloud browser)
+        self.browserbase: BrowserbaseService = get_browserbase_service()
+        self.visual_verifier: VisualVerificationService = get_visual_verification_service()
+        self.use_browserbase = self.browserbase.is_available
+        self.screenshots: List[bytes] = []  # Store screenshots for verification
+        self.session_replay_url: Optional[str] = None
+
         logger.info(f"Initialized EditingAgent with model: {self.model}")
+        logger.info(f"Browserbase available: {self.use_browserbase}")
 
     async def edit(
         self,
@@ -283,6 +294,26 @@ Always return valid, complete HTML."""
 
             self.current_html = html
             self.selected_element = selected_element  # Store for auto-injection in tools
+            self.screenshots = []  # Reset screenshots for this edit session
+            self.session_replay_url = None
+
+            # Initialize Browserbase session if available
+            browserbase_page = None
+            if self.use_browserbase:
+                try:
+                    browserbase_page = await self.browserbase.connect()
+                    if browserbase_page:
+                        await self.browserbase.load_html(html)
+                        self.session_replay_url = self.browserbase.get_session_replay_url()
+                        logger.info(f"EditingAgent: Browserbase session ready - {self.session_replay_url}")
+
+                        # Capture initial screenshot
+                        initial_screenshot = await self.browserbase.screenshot()
+                        if initial_screenshot:
+                            self.screenshots.append(initial_screenshot)
+                except Exception as e:
+                    logger.warning(f"EditingAgent: Browserbase init failed, using local Playwright: {e}")
+                    browserbase_page = None
 
             # Build context-aware system prompt
             system_prompt = build_editing_system_prompt(
@@ -381,11 +412,35 @@ Always return valid, complete HTML."""
                         logger.info(f"EditingAgent: finalize_edit called - summary: {edit_summary}")
                         logger.info(f"EditingAgent: Using self.current_html with length: {len(final_html)}")
 
+                        # Capture final screenshot if Browserbase is active
+                        if browserbase_page:
+                            try:
+                                # Update the browser with final HTML
+                                await self.browserbase.load_html(final_html)
+                                final_screenshot = await self.browserbase.screenshot()
+                                if final_screenshot:
+                                    self.screenshots.append(final_screenshot)
+
+                                # Optionally verify the edit visually
+                                if len(self.screenshots) >= 2 and self.visual_verifier.is_available:
+                                    verification = await self.visual_verifier.verify_edit(
+                                        before_screenshot=self.screenshots[0],
+                                        after_screenshot=self.screenshots[-1],
+                                        expected_change=instruction
+                                    )
+                                    logger.info(f"EditingAgent: Visual verification - verified={verification.get('verified')}, confidence={verification.get('confidence')}")
+                            except Exception as e:
+                                logger.warning(f"EditingAgent: Screenshot/verification error: {e}")
+                            finally:
+                                # Clean up Browserbase session
+                                await self.browserbase.close()
+
                         return {
                             "success": True,
                             "html": final_html,
                             "summary": edit_summary,
-                            "iterations": iteration
+                            "iterations": iteration,
+                            "replay_url": self.session_replay_url
                         }
 
                     # Update current HTML if edit was successful
@@ -403,19 +458,34 @@ Always return valid, complete HTML."""
                 messages.extend(tool_results)
 
             # If we exhausted iterations, return current state
+            # Clean up Browserbase session
+            if browserbase_page:
+                try:
+                    await self.browserbase.close()
+                except Exception:
+                    pass
+
             return {
                 "success": True,
                 "html": self.current_html,
                 "summary": edit_summary or "Edit completed",
-                "iterations": iteration
+                "iterations": iteration,
+                "replay_url": self.session_replay_url
             }
 
         except Exception as e:
             logger.error(f"EditingAgent: Error - {str(e)}")
+            # Clean up Browserbase session on error
+            if self.use_browserbase:
+                try:
+                    await self.browserbase.close()
+                except Exception:
+                    pass
             return {
                 "success": False,
                 "error": str(e),
-                "html": html  # Return original on error
+                "html": html,  # Return original on error
+                "replay_url": self.session_replay_url
             }
 
     async def _execute_tool(self, tool_name: str, tool_input: Dict) -> Dict[str, Any]:
@@ -433,7 +503,7 @@ Always return valid, complete HTML."""
                 return await self._analyze_dom(tool_input.get("html", self.current_html))
 
             elif tool_name == "edit_text":
-                return await self._edit_via_playwright(
+                return await self._edit_with_fallback(
                     html=tool_input.get("html", self.current_html),
                     selector=get_selector(),
                     edit_type="text",
@@ -441,7 +511,7 @@ Always return valid, complete HTML."""
                 )
 
             elif tool_name == "edit_style":
-                return await self._edit_via_playwright(
+                return await self._edit_with_fallback(
                     html=tool_input.get("html", self.current_html),
                     selector=get_selector(),
                     edit_type="style",
@@ -449,7 +519,7 @@ Always return valid, complete HTML."""
                 )
 
             elif tool_name == "edit_attribute":
-                return await self._edit_via_playwright(
+                return await self._edit_with_fallback(
                     html=tool_input.get("html", self.current_html),
                     selector=get_selector(),
                     edit_type="attribute",
@@ -460,7 +530,7 @@ Always return valid, complete HTML."""
                 )
 
             elif tool_name == "replace_element":
-                return await self._edit_via_playwright(
+                return await self._edit_with_fallback(
                     html=tool_input.get("html", self.current_html),
                     selector=get_selector(),
                     edit_type="replace",
@@ -647,6 +717,103 @@ Always return valid, complete HTML."""
 
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+    async def _edit_via_browserbase(
+        self,
+        selector: str,
+        edit_type: str,
+        edit_value: Any
+    ) -> Dict[str, Any]:
+        """
+        Execute edit via Browserbase cloud browser.
+
+        This is an alternative to local Playwright that provides:
+        - Cloud-based execution (no local resources)
+        - Session replay for debugging
+        - Screenshot capture for verification
+
+        Args:
+            selector: CSS selector for target element
+            edit_type: Type of edit (text, style, class, attribute, replace)
+            edit_value: Value to apply
+
+        Returns:
+            Dict with success, html, and message
+        """
+        if not self.browserbase.is_available:
+            return {"success": False, "error": "Browserbase not available"}
+
+        try:
+            # Map edit types to Browserbase execute_edit types
+            type_mapping = {
+                "text": "text",
+                "style": "style",
+                "class": "class",
+                "attribute": "attribute",
+                "replace": "outerHtml"
+            }
+
+            bb_edit_type = type_mapping.get(edit_type, edit_type)
+
+            # Prepare value based on type
+            if edit_type == "style" and isinstance(edit_value, dict):
+                edit_value = json.dumps(edit_value)
+            elif edit_type == "attribute" and isinstance(edit_value, dict):
+                edit_value = f"{edit_value.get('name')}={edit_value.get('value', '')}"
+
+            # Execute the edit
+            result = await self.browserbase.execute_edit(
+                selector=selector,
+                edit_type=bb_edit_type,
+                value=str(edit_value)
+            )
+
+            if result.get("success"):
+                # Get the updated HTML from browser
+                html = await self.browserbase.get_html()
+                if html:
+                    return {
+                        "success": True,
+                        "html": html,
+                        "message": f"Successfully edited {selector} via Browserbase"
+                    }
+                return {"success": False, "error": "Failed to get updated HTML"}
+            else:
+                return {"success": False, "error": result.get("error", "Edit failed")}
+
+        except Exception as e:
+            logger.error(f"Browserbase edit error: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def _edit_with_fallback(
+        self,
+        html: str,
+        selector: str,
+        edit_type: str,
+        edit_value: Any
+    ) -> Dict[str, Any]:
+        """
+        Execute edit with Browserbase first, fallback to local Playwright.
+
+        Args:
+            html: Current HTML
+            selector: CSS selector
+            edit_type: Type of edit
+            edit_value: Value to apply
+
+        Returns:
+            Edit result dict
+        """
+        # Try Browserbase first if available and connected
+        if self.use_browserbase and self.browserbase._page:
+            logger.info(f"EditingAgent: Trying Browserbase for {edit_type} on {selector}")
+            result = await self._edit_via_browserbase(selector, edit_type, edit_value)
+            if result.get("success"):
+                return result
+            logger.warning(f"EditingAgent: Browserbase failed, falling back to local Playwright")
+
+        # Fallback to local Playwright
+        return await self._edit_via_playwright(html, selector, edit_type, edit_value)
 
 
 # Singleton instance

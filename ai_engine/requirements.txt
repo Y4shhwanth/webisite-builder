@@ -24,3 +24,7 @@ beautifulsoup4>=4.12.3
 structlog>=24.1.0
 sentry-sdk[fastapi]>=1.40.0
 slowapi>=0.1.9
+
+# Browser Automation (Browserbase)
+browserbase>=1.0.0
+playwright>=1.40.0
