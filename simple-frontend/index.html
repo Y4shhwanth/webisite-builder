@@ -1957,6 +1957,10 @@
             const iframe = document.getElementById('previewFrame');
             const iframeRect = iframe.getBoundingClientRect();
 
+            // Store the selected image element for later use
+            lastSelectedImage = selectedElement;
+            console.log('Stored lastSelectedImage:', lastSelectedImage);
+
             // Position toolbar above the clicked element
             const x = iframeRect.left + e.clientX;
             const y = iframeRect.top + e.clientY - 50;
@@ -1982,18 +1986,28 @@
 
         // ========== IMAGE EDITING ==========
         let currentImageUrl = '';
+        let lastSelectedImage = null;  // Store the last selected image element
 
         function openImageUrlEdit() {
             console.log('openImageUrlEdit called');
+            console.log('selectedElement:', selectedElement);
+            console.log('lastSelectedImage:', lastSelectedImage);
 
             // Hide image toolbar first
             const imageToolbar = document.getElementById('imageToolbar');
             if (imageToolbar) imageToolbar.classList.remove('visible');
 
-            if (!selectedElement) {
+            // Use lastSelectedImage if selectedElement is lost
+            const imageElement = selectedElement || lastSelectedImage;
+
+            if (!imageElement) {
+                console.log('No image element available');
                 showToast('No image selected', 'error');
                 return;
             }
+
+            // Make sure we're working with the image
+            selectedElement = imageElement;
 
             // Get current image URL
             currentImageUrl = '';
