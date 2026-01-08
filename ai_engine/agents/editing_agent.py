@@ -247,6 +247,7 @@ Always return valid, complete HTML."""
         self.model = model or "anthropic/claude-3.5-sonnet"
         self.playwright_url = settings.PLAYWRIGHT_SERVICE_URL
         self.current_html = ""
+        self.selected_element = None  # Store for auto-injection in tools
         self.max_iterations = 5
         self.temperature = 0.3
 
@@ -281,6 +282,7 @@ Always return valid, complete HTML."""
                 logger.info(f"EditingAgent: Target element: {selected_element.get('selector', 'none')}")
 
             self.current_html = html
+            self.selected_element = selected_element  # Store for auto-injection in tools
 
             # Build context-aware system prompt
             system_prompt = build_editing_system_prompt(
@@ -419,13 +421,21 @@ Always return valid, complete HTML."""
     async def _execute_tool(self, tool_name: str, tool_input: Dict) -> Dict[str, Any]:
         """Execute a tool and return the result."""
         try:
+            # Helper to get selector with auto-injection from selected_element
+            def get_selector():
+                selector = tool_input.get("selector", "")
+                if not selector and self.selected_element:
+                    selector = self.selected_element.get("selector", "")
+                    logger.info(f"EditingAgent: AUTO-INJECTING selector: '{selector}'")
+                return selector
+
             if tool_name == "analyze_dom":
                 return await self._analyze_dom(tool_input.get("html", self.current_html))
 
             elif tool_name == "edit_text":
                 return await self._edit_via_playwright(
                     html=tool_input.get("html", self.current_html),
-                    selector=tool_input.get("selector"),
+                    selector=get_selector(),
                     edit_type="text",
                     edit_value=tool_input.get("new_text")
                 )
@@ -433,7 +443,7 @@ Always return valid, complete HTML."""
             elif tool_name == "edit_style":
                 return await self._edit_via_playwright(
                     html=tool_input.get("html", self.current_html),
-                    selector=tool_input.get("selector"),
+                    selector=get_selector(),
                     edit_type="style",
                     edit_value=tool_input.get("styles")
                 )
@@ -441,7 +451,7 @@ Always return valid, complete HTML."""
             elif tool_name == "edit_attribute":
                 return await self._edit_via_playwright(
                     html=tool_input.get("html", self.current_html),
-                    selector=tool_input.get("selector"),
+                    selector=get_selector(),
                     edit_type="attribute",
                     edit_value={
                         "name": tool_input.get("attribute"),
@@ -452,7 +462,7 @@ Always return valid, complete HTML."""
             elif tool_name == "replace_element":
                 return await self._edit_via_playwright(
                     html=tool_input.get("html", self.current_html),
-                    selector=tool_input.get("selector"),
+                    selector=get_selector(),
                     edit_type="replace",
                     edit_value=tool_input.get("new_html")
                 )
@@ -464,6 +474,11 @@ Always return valid, complete HTML."""
                 selector = tool_input.get("selector", "")
                 old_class = tool_input.get("old_class", "")
                 new_class = tool_input.get("new_class", "")
+
+                # AUTO-INJECT: If no selector provided but we have a selected_element, use it
+                if not selector and self.selected_element:
+                    selector = self.selected_element.get("selector", "")
+                    logger.info(f"EditingAgent: modify_class - AUTO-INJECTING selector from selected_element: '{selector}'")
 
                 logger.info(f"EditingAgent: modify_class - selector='{selector}', '{old_class}' -> '{new_class}'")
 
@@ -516,6 +531,9 @@ Always return valid, complete HTML."""
                 if old_class in self.current_html:
                     # Try to do a more targeted replacement using the element's outer HTML
                     outer_html = tool_input.get("outer_html", "")
+                    # Also try from selected_element if available
+                    if not outer_html and self.selected_element:
+                        outer_html = self.selected_element.get("outer_html", "")
                     if outer_html and old_class in outer_html:
                         new_outer_html = outer_html.replace(old_class, new_class)
                         modified_html = self.current_html.replace(outer_html, new_outer_html)
