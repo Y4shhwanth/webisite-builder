@@ -13,6 +13,7 @@ from services.openrouter_website_generator import (
     get_available_templates,
     WEBSITE_TEMPLATES
 )
+from services.design_context_extractor import extract_design_context
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -155,3 +156,58 @@ async def build_website(request: Request, data: BuildWebsiteRequest):
     except Exception as e:
         logger.error(f"Error building website: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class ExtractContextRequest(BaseModel):
+    """Request model for extracting design context"""
+    html: str
+
+
+class ExtractContextResponse(BaseModel):
+    """Response model for design context extraction"""
+    success: bool
+    design_context: Optional[dict] = None
+    error: Optional[str] = None
+
+
+@router.post("/build/extract-context", response_model=ExtractContextResponse)
+async def extract_context_from_html(data: ExtractContextRequest):
+    """
+    Extract design context from uploaded HTML.
+
+    This endpoint parses the HTML to extract:
+    - Fonts (Google Fonts, system fonts)
+    - Colors (CSS variables, inline colors)
+    - Sections (header, hero, about, services, etc.)
+    - Design tokens (spacing, border-radius, shadows)
+
+    This context is used to maintain design consistency during edits.
+    """
+    try:
+        if not data.html or len(data.html) < 50:
+            return ExtractContextResponse(
+                success=False,
+                error="Invalid or empty HTML"
+            )
+
+        # Extract design context
+        context = extract_design_context(data.html, template_id="uploaded")
+
+        logger.info(
+            "Design context extracted",
+            fonts=context.get("fonts", {}).get("display", "unknown"),
+            has_colors=bool(context.get("colors")),
+            sections_count=len(context.get("sections", []))
+        )
+
+        return ExtractContextResponse(
+            success=True,
+            design_context=context
+        )
+
+    except Exception as e:
+        logger.error(f"Error extracting design context: {str(e)}")
+        return ExtractContextResponse(
+            success=False,
+            error=str(e)
+        )

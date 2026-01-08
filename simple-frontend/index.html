@@ -886,6 +886,150 @@
             0%, 80%, 100% { transform: scale(0); }
             40% { transform: scale(1); }
         }
+
+        /* ========== WELCOME TABS ========== */
+        .welcome-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 24px;
+            border-bottom: 2px solid #e5e5e5;
+        }
+
+        .welcome-tab {
+            flex: 1;
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            font-size: 14px;
+            font-weight: 500;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .welcome-tab:hover {
+            color: #333;
+        }
+
+        .welcome-tab.active {
+            color: #667eea;
+        }
+
+        .welcome-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Upload HTML Section */
+        .upload-section {
+            text-align: left;
+        }
+
+        .upload-methods {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .upload-method-btn {
+            flex: 1;
+            padding: 12px;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            background: #fafafa;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .upload-method-btn:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .upload-method-btn.active {
+            border-color: #667eea;
+            border-style: solid;
+            background: #f0f3ff;
+        }
+
+        .upload-method-btn .icon {
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+
+        .upload-method-btn .label {
+            font-size: 13px;
+            color: #333;
+        }
+
+        .html-textarea {
+            width: 100%;
+            height: 200px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            resize: vertical;
+            margin-bottom: 16px;
+        }
+
+        .html-textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .file-upload-wrapper {
+            margin-bottom: 16px;
+        }
+
+        .file-input-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 40px;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #fafafa;
+        }
+
+        .file-input-label:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .file-input-label.has-file {
+            border-color: #28a745;
+            background: #f0fff4;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-name {
+            font-size: 13px;
+            color: #28a745;
+            margin-top: 8px;
+        }
     </style>
 </head>
 <body>
@@ -911,52 +1055,107 @@
                     <div class="welcome-screen" id="welcomeScreen">
                         <div class="welcome-content">
                             <h1>AI Website Builder</h1>
-                            <p>Create stunning portfolio websites with AI in seconds</p>
+                            <p>Create stunning websites with AI or edit your own HTML</p>
 
-                            <div class="input-group">
-                                <label>Topmate Username</label>
-                                <input type="text" id="username" placeholder="Enter your Topmate username">
+                            <!-- Tabs -->
+                            <div class="welcome-tabs">
+                                <button class="welcome-tab active" onclick="switchWelcomeTab('generate')">Generate New</button>
+                                <button class="welcome-tab" onclick="switchWelcomeTab('upload')">Upload HTML</button>
                             </div>
 
-                            <!-- Template Selection -->
-                            <div class="template-section">
-                                <div class="template-section-title">Choose a Template Style</div>
-                                <div class="template-grid">
-                                    <div class="template-card selected" data-template="modern-minimal" onclick="selectTemplate(this)">
-                                        <div class="template-icon minimal">◻️</div>
-                                        <div class="template-name">Modern Minimal</div>
-                                        <div class="template-desc">Clean design with focus on content</div>
+                            <!-- Tab 1: Generate New Website -->
+                            <div class="tab-content active" id="generateTab">
+                                <div class="input-group">
+                                    <label>Topmate Username</label>
+                                    <input type="text" id="username" placeholder="Enter your Topmate username">
+                                </div>
+
+                                <!-- Template Selection -->
+                                <div class="template-section">
+                                    <div class="template-section-title">Choose a Template Style</div>
+                                    <div class="template-grid">
+                                        <div class="template-card selected" data-template="modern-minimal" onclick="selectTemplate(this)">
+                                            <div class="template-icon minimal">◻️</div>
+                                            <div class="template-name">Modern Minimal</div>
+                                            <div class="template-desc">Clean design with focus on content</div>
+                                        </div>
+                                        <div class="template-card" data-template="bold-creative" onclick="selectTemplate(this)">
+                                            <div class="template-icon bold">🎨</div>
+                                            <div class="template-name">Bold & Creative</div>
+                                            <div class="template-desc">Vibrant colors, dynamic layouts</div>
+                                        </div>
+                                        <div class="template-card" data-template="professional-corporate" onclick="selectTemplate(this)">
+                                            <div class="template-icon corporate">💼</div>
+                                            <div class="template-name">Professional</div>
+                                            <div class="template-desc">Trust-building business design</div>
+                                        </div>
+                                        <div class="template-card" data-template="dark-elegant" onclick="selectTemplate(this)">
+                                            <div class="template-icon dark">🌙</div>
+                                            <div class="template-name">Dark & Elegant</div>
+                                            <div class="template-desc">Sophisticated dark theme</div>
+                                        </div>
+                                        <div class="template-card" data-template="vibrant-gradient" onclick="selectTemplate(this)">
+                                            <div class="template-icon gradient">✨</div>
+                                            <div class="template-name">Vibrant Gradient</div>
+                                            <div class="template-desc">Eye-catching glass effects</div>
+                                        </div>
                                     </div>
-                                    <div class="template-card" data-template="bold-creative" onclick="selectTemplate(this)">
-                                        <div class="template-icon bold">🎨</div>
-                                        <div class="template-name">Bold & Creative</div>
-                                        <div class="template-desc">Vibrant colors, dynamic layouts</div>
-                                    </div>
-                                    <div class="template-card" data-template="professional-corporate" onclick="selectTemplate(this)">
-                                        <div class="template-icon corporate">💼</div>
-                                        <div class="template-name">Professional</div>
-                                        <div class="template-desc">Trust-building business design</div>
-                                    </div>
-                                    <div class="template-card" data-template="dark-elegant" onclick="selectTemplate(this)">
-                                        <div class="template-icon dark">🌙</div>
-                                        <div class="template-name">Dark & Elegant</div>
-                                        <div class="template-desc">Sophisticated dark theme</div>
-                                    </div>
-                                    <div class="template-card" data-template="vibrant-gradient" onclick="selectTemplate(this)">
-                                        <div class="template-icon gradient">✨</div>
-                                        <div class="template-name">Vibrant Gradient</div>
-                                        <div class="template-desc">Eye-catching glass effects</div>
-                                    </div>
+                                </div>
+
+                                <div class="input-group">
+                                    <label>Custom Instructions (Optional)</label>
+                                    <textarea id="userPrompt" placeholder="e.g., Focus on my consulting services, highlight testimonials"></textarea>
+                                </div>
+
+                                <div class="welcome-actions">
+                                    <button class="btn btn-primary" onclick="generateWebsite()">Generate Website</button>
                                 </div>
                             </div>
 
-                            <div class="input-group">
-                                <label>Custom Instructions (Optional)</label>
-                                <textarea id="userPrompt" placeholder="e.g., Focus on my consulting services, highlight testimonials"></textarea>
-                            </div>
+                            <!-- Tab 2: Upload HTML -->
+                            <div class="tab-content" id="uploadTab">
+                                <div class="upload-section">
+                                    <div class="upload-methods">
+                                        <div class="upload-method-btn active" onclick="switchUploadMethod('paste')">
+                                            <div class="icon">📋</div>
+                                            <div class="label">Paste HTML</div>
+                                        </div>
+                                        <div class="upload-method-btn" onclick="switchUploadMethod('file')">
+                                            <div class="icon">📁</div>
+                                            <div class="label">Upload File</div>
+                                        </div>
+                                    </div>
 
-                            <div class="welcome-actions">
-                                <button class="btn btn-primary" onclick="generateWebsite()">Generate Website</button>
+                                    <!-- Paste HTML Section -->
+                                    <div id="pasteSection">
+                                        <textarea class="html-textarea" id="htmlInput" placeholder="Paste your HTML code here...
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My Website</title>
+</head>
+<body>
+    <!-- Your content here -->
+</body>
+</html>"></textarea>
+                                    </div>
+
+                                    <!-- File Upload Section -->
+                                    <div id="fileSection" style="display: none;">
+                                        <div class="file-upload-wrapper">
+                                            <label class="file-input-label" id="fileInputLabel">
+                                                <span>📄 Drop HTML file here or click to browse</span>
+                                                <input type="file" class="file-input" id="htmlFileInput" accept=".html,.htm" onchange="handleFileUpload(event)">
+                                            </label>
+                                            <div class="file-name" id="fileName" style="display: none;"></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="welcome-actions">
+                                        <button class="btn btn-primary" onclick="loadUploadedHTML()">Load & Edit</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1153,6 +1352,155 @@
             };
 
             console.log('Preview frame updated with HTML length:', html.length);
+        }
+
+        // ========== WELCOME TAB SWITCHING ==========
+        function switchWelcomeTab(tab) {
+            // Update tab buttons
+            document.querySelectorAll('.welcome-tab').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Update tab content
+            document.getElementById('generateTab').classList.remove('active');
+            document.getElementById('uploadTab').classList.remove('active');
+
+            if (tab === 'generate') {
+                document.getElementById('generateTab').classList.add('active');
+            } else {
+                document.getElementById('uploadTab').classList.add('active');
+            }
+        }
+
+        // ========== UPLOAD METHOD SWITCHING ==========
+        function switchUploadMethod(method) {
+            // Update method buttons
+            document.querySelectorAll('.upload-method-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.closest('.upload-method-btn').classList.add('active');
+
+            // Show/hide sections
+            if (method === 'paste') {
+                document.getElementById('pasteSection').style.display = 'block';
+                document.getElementById('fileSection').style.display = 'none';
+            } else {
+                document.getElementById('pasteSection').style.display = 'none';
+                document.getElementById('fileSection').style.display = 'block';
+            }
+        }
+
+        // ========== FILE UPLOAD HANDLING ==========
+        let uploadedFileContent = '';
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                uploadedFileContent = e.target.result;
+                document.getElementById('fileInputLabel').classList.add('has-file');
+                document.getElementById('fileName').textContent = `✓ ${file.name}`;
+                document.getElementById('fileName').style.display = 'block';
+                showToast('File loaded successfully!', 'success');
+            };
+            reader.onerror = function() {
+                showToast('Error reading file', 'error');
+            };
+            reader.readAsText(file);
+        }
+
+        // ========== LOAD UPLOADED HTML ==========
+        async function loadUploadedHTML() {
+            // Get HTML from paste or file
+            let html = '';
+            const pasteSection = document.getElementById('pasteSection');
+
+            if (pasteSection.style.display !== 'none') {
+                html = document.getElementById('htmlInput').value.trim();
+            } else {
+                html = uploadedFileContent;
+            }
+
+            if (!html) {
+                showToast('Please paste HTML or upload a file first', 'error');
+                return;
+            }
+
+            // Validate it's HTML
+            if (!html.includes('<') || !html.includes('>')) {
+                showToast('Invalid HTML content', 'error');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            document.querySelector('.loading-text').textContent = 'Loading your HTML...';
+
+            try {
+                // Set the HTML
+                currentHTML = html;
+                currentUsername = 'custom';
+
+                // Try to extract design context from the uploaded HTML
+                try {
+                    const response = await fetch(`${AI_BASE}/api/build/extract-context`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ html: html })
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        designContext = data.design_context;
+                        console.log('Extracted design context:', designContext);
+                    }
+                } catch (e) {
+                    console.log('Could not extract design context, will edit without it');
+                    designContext = null;
+                }
+
+                // Hide welcome screen
+                document.getElementById('welcomeScreen').classList.add('hidden');
+                document.getElementById('loadingOverlay').style.display = 'none';
+
+                // Update preview
+                updatePreviewFrame(currentHTML);
+
+                // Show toolbar
+                document.getElementById('bottomToolbar').classList.add('visible');
+
+                // Update project name
+                document.getElementById('projectName').textContent = 'Uploaded Website';
+
+                // Initialize chat session for editing
+                chatSessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                try {
+                    await fetch(`${AI_BASE}/api/chat/init`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            session_id: chatSessionId,
+                            username: 'custom'
+                        })
+                    });
+                    // Sync the HTML with the chat session
+                    await fetch(`${AI_BASE}/api/chat/apply-html`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            session_id: chatSessionId,
+                            html: currentHTML
+                        })
+                    });
+                } catch (e) {
+                    console.log('Chat init error:', e);
+                }
+
+                showToast('HTML loaded! Use AI chat to edit.', 'success');
+
+            } catch (error) {
+                console.error('Error loading HTML:', error);
+                document.getElementById('loadingOverlay').style.display = 'none';
+                showToast('Error loading HTML: ' + error.message, 'error');
+            }
         }
 
         // ========== TEMPLATE SELECTION ==========
