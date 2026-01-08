@@ -1,9 +1,12 @@
 {
-  "framework": null,
-  "outputDirectory": "simple-frontend",
+  "version": 2,
+  "rewrites": [
+    { "source": "/((?!api).*)", "destination": "/simple-frontend/$1" }
+  ],
   "functions": {
-    "api/*.py": {
-      "maxDuration": 60
+    "api/**/*.py": {
+      "maxDuration": 60,
+      "runtime": "python3.11"
     }
   }
 }
