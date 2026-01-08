@@ -1953,14 +1953,13 @@
 
         // ========== IMAGE EDITING ==========
         function openImageUrlEdit() {
-            alert('Replace URL clicked! Function is working.');
             console.log('openImageUrlEdit called');
 
             // Hide image toolbar first
             document.getElementById('imageToolbar').classList.remove('visible');
 
             if (!selectedElement) {
-                alert('No image selected');
+                showToast('No image selected', 'error');
                 return;
             }
 
@@ -1974,8 +1973,6 @@
                     currentUrl = bgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
                 }
             }
-
-            alert('Current URL: ' + currentUrl.substring(0, 50) + '...');
 
             // Use browser prompt for simplicity
             const newUrl = prompt('Enter new image URL:', currentUrl);
@@ -1997,18 +1994,34 @@
             showToast('Replacing image...', '');
             htmlHistory.push(currentHTML);
 
-            if (selectedElement.tagName.toLowerCase() === 'img') {
-                // Direct image element - update src
-                selectedElement.src = newUrl;
+            console.log('Replacing image URL');
+            console.log('Old URL:', oldUrl);
+            console.log('New URL:', newUrl);
 
-                // Update currentHTML
-                if (oldUrl) {
-                    currentHTML = currentHTML.replace(
-                        new RegExp(`src=["']${escapeRegExp(oldUrl)}["']`, 'g'),
-                        `src="${newUrl}"`
-                    );
+            if (selectedElement && selectedElement.tagName.toLowerCase() === 'img') {
+                // Direct image element - update in HTML string
+                console.log('Replacing img src in HTML');
+
+                // Method 1: Try exact string replacement
+                if (oldUrl && currentHTML.includes(oldUrl)) {
+                    currentHTML = currentHTML.split(oldUrl).join(newUrl);
+                    console.log('Replaced using split/join method');
+                } else {
+                    // Method 2: Try regex with escaped URL
+                    const escapedOldUrl = oldUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = new RegExp(escapedOldUrl, 'g');
+                    if (regex.test(currentHTML)) {
+                        currentHTML = currentHTML.replace(regex, newUrl);
+                        console.log('Replaced using regex method');
+                    } else {
+                        console.log('Old URL not found in HTML, trying alternative methods');
+                        // Method 3: Find any src with similar pattern and replace
+                        const srcRegex = new RegExp(`src=["'][^"']*${selectedElement.src.split('/').pop()}[^"']*["']`, 'g');
+                        currentHTML = currentHTML.replace(srcRegex, `src="${newUrl}"`);
+                    }
                 }
 
+                // Update preview
                 updatePreviewFrame(currentHTML);
                 await syncHTML();
                 showToast('Image replaced!', 'success');
