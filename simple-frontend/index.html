@@ -1925,19 +1925,34 @@
         function hideAllToolbars() {
             document.getElementById('floatingToolbar').classList.remove('visible');
             document.getElementById('imageToolbar').classList.remove('visible');
-            document.getElementById('imageUrlContainer').classList.remove('active');
+            const urlContainer = document.getElementById('imageUrlContainer');
+            urlContainer.classList.remove('active');
+            urlContainer.style.display = 'none';
         }
 
         // ========== IMAGE EDITING ==========
         function openImageUrlEdit() {
-            hideAllToolbars();
+            console.log('openImageUrlEdit called');
+
+            // Hide image toolbar first
+            document.getElementById('imageToolbar').classList.remove('visible');
+
             const container = document.getElementById('imageUrlContainer');
             const input = document.getElementById('imageUrlInput');
             const iframe = document.getElementById('previewFrame');
+
+            if (!container) {
+                console.error('imageUrlContainer not found!');
+                alert('Error: Image URL container not found');
+                return;
+            }
+
             const iframeRect = iframe.getBoundingClientRect();
+            console.log('iframe rect:', iframeRect);
 
             // Get current image URL
             if (selectedElement) {
+                console.log('selectedElement:', selectedElement.tagName);
                 if (selectedElement.tagName.toLowerCase() === 'img') {
                     input.value = selectedElement.src || '';
                 } else {
@@ -1951,17 +1966,23 @@
                 }
             }
 
-            // Position container in center of iframe
-            container.style.left = `${iframeRect.left + (iframeRect.width / 2) - 175}px`;
-            container.style.top = `${iframeRect.top + 100}px`;
+            // Position container in center of screen (more reliable)
+            container.style.left = '50%';
+            container.style.top = '150px';
+            container.style.transform = 'translateX(-50%)';
+            container.style.display = 'block';
             container.classList.add('active');
+
+            console.log('Container should be visible now');
 
             input.focus();
             input.select();
         }
 
         function cancelImageUrlEdit() {
-            document.getElementById('imageUrlContainer').classList.remove('active');
+            const container = document.getElementById('imageUrlContainer');
+            container.classList.remove('active');
+            container.style.display = 'none';
         }
 
         async function saveImageUrl() {
