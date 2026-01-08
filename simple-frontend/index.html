@@ -1953,13 +1953,14 @@
 
         // ========== IMAGE EDITING ==========
         function openImageUrlEdit() {
+            alert('Replace URL clicked! Function is working.');
             console.log('openImageUrlEdit called');
 
             // Hide image toolbar first
             document.getElementById('imageToolbar').classList.remove('visible');
 
             if (!selectedElement) {
-                showToast('No image selected', 'error');
+                alert('No image selected');
                 return;
             }
 
@@ -1973,6 +1974,8 @@
                     currentUrl = bgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
                 }
             }
+
+            alert('Current URL: ' + currentUrl.substring(0, 50) + '...');
 
             // Use browser prompt for simplicity
             const newUrl = prompt('Enter new image URL:', currentUrl);
