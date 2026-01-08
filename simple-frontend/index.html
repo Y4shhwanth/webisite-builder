@@ -1997,60 +1997,42 @@
             console.log('Replacing image URL');
             console.log('Old URL:', oldUrl);
             console.log('New URL:', newUrl);
+            console.log('Selected element:', selectedElement?.tagName);
+            console.log('Selected element src:', selectedElement?.src);
 
-            if (selectedElement && selectedElement.tagName.toLowerCase() === 'img') {
-                // Direct image element - update in HTML string
-                console.log('Replacing img src in HTML');
+            // Always use AI for reliable replacement
+            try {
+                const instruction = selectedElement?.tagName?.toLowerCase() === 'img'
+                    ? `Change the src attribute of this image to "${newUrl}". The current src is "${oldUrl}". Replace it with the new URL.`
+                    : `Change the background image of this element to "${newUrl}"`;
 
-                // Method 1: Try exact string replacement
-                if (oldUrl && currentHTML.includes(oldUrl)) {
-                    currentHTML = currentHTML.split(oldUrl).join(newUrl);
-                    console.log('Replaced using split/join method');
+                console.log('Sending edit instruction:', instruction);
+
+                const response = await fetch(`${AI_BASE}/api/edit/optimized`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        html: currentHTML,
+                        edit_instruction: instruction,
+                        design_context: designContext,
+                        selected_element: buildSelectedElementData()
+                    })
+                });
+
+                const data = await response.json();
+                console.log('API response:', data);
+
+                if (data.html) {
+                    currentHTML = data.html;
+                    updatePreviewFrame(currentHTML);
+                    await syncHTML();
+                    showToast('Image replaced!', 'success');
                 } else {
-                    // Method 2: Try regex with escaped URL
-                    const escapedOldUrl = oldUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                    const regex = new RegExp(escapedOldUrl, 'g');
-                    if (regex.test(currentHTML)) {
-                        currentHTML = currentHTML.replace(regex, newUrl);
-                        console.log('Replaced using regex method');
-                    } else {
-                        console.log('Old URL not found in HTML, trying alternative methods');
-                        // Method 3: Find any src with similar pattern and replace
-                        const srcRegex = new RegExp(`src=["'][^"']*${selectedElement.src.split('/').pop()}[^"']*["']`, 'g');
-                        currentHTML = currentHTML.replace(srcRegex, `src="${newUrl}"`);
-                    }
+                    showToast('Failed to replace image: ' + (data.error || 'Unknown error'), 'error');
                 }
-
-                // Update preview
-                updatePreviewFrame(currentHTML);
-                await syncHTML();
-                showToast('Image replaced!', 'success');
-            } else {
-                // Background image - use AI
-                try {
-                    const response = await fetch(`${AI_BASE}/api/edit/optimized`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            html: currentHTML,
-                            edit_instruction: `Change the background image of this element to "${newUrl}"`,
-                            design_context: designContext,
-                            selected_element: buildSelectedElementData()
-                        })
-                    });
-
-                    const data = await response.json();
-                    if (data.html) {
-                        currentHTML = data.html;
-                        updatePreviewFrame(currentHTML);
-                        await syncHTML();
-                        showToast('Image replaced!', 'success');
-                    } else {
-                        showToast('Failed to replace image', 'error');
-                    }
-                } catch (error) {
-                    showToast(`Error: ${error.message}`, 'error');
-                }
+            } catch (error) {
+                console.error('Error replacing image:', error);
+                showToast(`Error: ${error.message}`, 'error');
             }
         }
 
