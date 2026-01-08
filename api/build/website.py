@@ -65,10 +65,11 @@ class handler(BaseHTTPRequestHandler):
                 "design_context": {}
             })
 
-        except urllib.error.HTTPError:
-            self._send_json({"success": False, "error": f"User {username} not found"}, 404)
+        except urllib.error.HTTPError as e:
+            self._send_json({"success": False, "error": f"User {username} not found", "details": str(e)}, 404)
         except Exception as e:
-            self._send_json({"success": False, "error": str(e)}, 500)
+            import traceback
+            self._send_json({"success": False, "error": str(e), "traceback": traceback.format_exc()}, 500)
 
     def _send_cors_headers(self):
         self.send_header('Access-Control-Allow-Origin', '*')
