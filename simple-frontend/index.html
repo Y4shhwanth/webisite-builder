@@ -1285,12 +1285,12 @@
         // Auto-detect environment: use production URLs on Vercel, localhost for dev
         const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
 
-        // TODO: Replace these with your deployed backend URLs
+        // Production URLs
         const API_BASE = isProduction
-            ? 'https://your-django-backend.railway.app/api'  // Django backend
+            ? ''  // Django backend not used in this deployment
             : 'http://localhost:8000/api';
         const AI_BASE = isProduction
-            ? 'https://your-ai-engine.railway.app'  // FastAPI AI Engine
+            ? 'https://webisite-builder.onrender.com'  // Render AI Engine
             : 'http://localhost:8001';
 
         // ========== STATE ==========
