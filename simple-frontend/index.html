@@ -1761,7 +1761,9 @@
                 classes: Array.from(element.classList).filter(c => !c.startsWith('ai-')),
                 text: element.textContent?.substring(0, 200),
                 parent_selector: element.parentElement ? getSelector(element.parentElement) : null,
-                attributes: getElementAttributes(element)
+                attributes: getElementAttributes(element),
+                outer_html: getElementHtml(element),
+                color_classes: getColorClasses(element)
             };
 
             // Open sidebar if not open
@@ -1771,23 +1773,75 @@
         }
 
         function getSelector(element) {
+            // Build a more specific selector for better targeting
             if (element.id) return `#${element.id}`;
-            if (element.className) {
-                const classes = element.className.split(' ').filter(c => !c.startsWith('ai-'));
-                if (classes.length) return `${element.tagName.toLowerCase()}.${classes[0]}`;
+
+            const tag = element.tagName.toLowerCase();
+            const classes = element.className ?
+                element.className.split(' ').filter(c => c && !c.startsWith('ai-')) : [];
+
+            // Try to build a unique selector
+            if (classes.length > 0) {
+                // Use multiple classes for specificity
+                const classSelector = classes.slice(0, 3).map(c => `.${c}`).join('');
+                let selector = `${tag}${classSelector}`;
+
+                // Add nth-child if there are siblings with same selector
+                if (element.parentElement) {
+                    const siblings = Array.from(element.parentElement.children);
+                    const sameTagSiblings = siblings.filter(s => s.tagName === element.tagName);
+                    if (sameTagSiblings.length > 1) {
+                        const index = sameTagSiblings.indexOf(element) + 1;
+                        selector += `:nth-of-type(${index})`;
+                    }
+                }
+                return selector;
             }
-            return element.tagName.toLowerCase();
+
+            // Fallback to tag with nth-child
+            if (element.parentElement) {
+                const siblings = Array.from(element.parentElement.children);
+                const sameTagSiblings = siblings.filter(s => s.tagName === element.tagName);
+                if (sameTagSiblings.length > 1) {
+                    const index = sameTagSiblings.indexOf(element) + 1;
+                    return `${tag}:nth-of-type(${index})`;
+                }
+            }
+            return tag;
         }
 
         function getElementAttributes(element) {
             const attrs = {};
-            const importantAttrs = ['href', 'src', 'alt', 'id', 'data-id'];
+            const importantAttrs = ['href', 'src', 'alt', 'id', 'data-id', 'class'];
             importantAttrs.forEach(attr => {
                 if (element.hasAttribute(attr)) {
                     attrs[attr] = element.getAttribute(attr);
                 }
             });
             return attrs;
+        }
+
+        // Get element's outer HTML (truncated for large elements)
+        function getElementHtml(element) {
+            if (!element) return null;
+            const html = element.outerHTML;
+            // Truncate if too large, but keep enough context
+            if (html.length > 2000) {
+                return html.substring(0, 2000) + '... (truncated)';
+            }
+            return html;
+        }
+
+        // Extract Tailwind color classes from element
+        function getColorClasses(element) {
+            if (!element.className) return [];
+            const classes = element.className.split(' ');
+            const colorPatterns = [
+                /^(bg|text|border|ring|shadow)-/,
+                /^(from|via|to)-/,  // gradients
+                /^(hover:|focus:|active:)?(bg|text|border)-/
+            ];
+            return classes.filter(c => colorPatterns.some(p => p.test(c)));
         }
 
         // Build selected element data for API (without DOM element reference)
@@ -1799,7 +1853,9 @@
                 classes: selectedComponent.classes,
                 text: selectedComponent.text,
                 parent_selector: selectedComponent.parent_selector,
-                attributes: selectedComponent.attributes
+                attributes: selectedComponent.attributes,
+                outer_html: selectedComponent.outer_html,
+                color_classes: selectedComponent.color_classes
             };
         }
 

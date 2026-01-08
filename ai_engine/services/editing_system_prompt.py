@@ -156,6 +156,13 @@ def build_element_context(selected_element: dict) -> str:
             classes = ' '.join(classes)
         lines.append(f"- CSS Classes: `{classes}`")
 
+    # Show color-related classes specifically (important for color edits)
+    if selected_element.get("color_classes"):
+        color_classes = selected_element["color_classes"]
+        if isinstance(color_classes, list) and color_classes:
+            lines.append(f"- **Current color classes**: `{' '.join(color_classes)}`")
+            lines.append("  (Use modify_class to change these for color edits)")
+
     if selected_element.get("parent_selector"):
         lines.append(f"- Parent: `{selected_element['parent_selector']}`")
 
@@ -168,11 +175,24 @@ def build_element_context(selected_element: dict) -> str:
     if selected_element.get("attributes"):
         attrs = selected_element["attributes"]
         if attrs:
-            attr_str = ', '.join(f'{k}="{v}"' for k, v in list(attrs.items())[:5])
-            lines.append(f"- Attributes: {attr_str}")
+            # Filter out 'class' since we show it above
+            filtered_attrs = {k: v for k, v in attrs.items() if k != 'class'}
+            if filtered_attrs:
+                attr_str = ', '.join(f'{k}="{v}"' for k, v in list(filtered_attrs.items())[:5])
+                lines.append(f"- Attributes: {attr_str}")
+
+    # Include element's actual HTML for precise editing
+    if selected_element.get("outer_html"):
+        html = selected_element["outer_html"]
+        if len(html) <= 500:
+            lines.append(f"\n### Element HTML:\n```html\n{html}\n```")
+        else:
+            # Truncate but show beginning and end
+            lines.append(f"\n### Element HTML (truncated):\n```html\n{html[:400]}...\n```")
 
     lines.append("\n**IMPORTANT**: Focus your edits on this element unless the instruction specifies otherwise.")
     lines.append("If the instruction is vague, assume it applies to this selected element.")
+    lines.append("For color changes, use the modify_class tool with the exact class names shown above.")
 
     return '\n'.join(lines)
 
