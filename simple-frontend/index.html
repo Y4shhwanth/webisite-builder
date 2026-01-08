@@ -1269,11 +1269,12 @@
     </div>
 
     <!-- Image URL Edit Container -->
-    <div class="inline-edit-container" id="imageUrlContainer">
-        <input type="text" class="inline-edit-textarea" id="imageUrlInput" placeholder="Enter new image URL..." style="height: auto; padding: 10px;">
+    <div class="inline-edit-container" id="imageUrlContainer" style="width: 400px;">
+        <label style="font-size: 12px; color: #888; margin-bottom: 5px; display: block;">Paste new image URL:</label>
+        <input type="text" class="inline-edit-textarea" id="imageUrlInput" placeholder="https://example.com/image.jpg" style="height: auto; padding: 10px; width: 100%; box-sizing: border-box;">
         <div class="inline-edit-actions">
             <button class="inline-edit-btn cancel" onclick="cancelImageUrlEdit()">Cancel</button>
-            <button class="inline-edit-btn save" onclick="saveImageUrl()">Replace</button>
+            <button class="inline-edit-btn save" onclick="saveImageUrl()">Replace Image</button>
         </div>
     </div>
 
@@ -1933,6 +1934,7 @@
             const container = document.getElementById('imageUrlContainer');
             const input = document.getElementById('imageUrlInput');
             const iframe = document.getElementById('previewFrame');
+            const iframeRect = iframe.getBoundingClientRect();
 
             // Get current image URL
             if (selectedElement) {
@@ -1943,15 +1945,15 @@
                     const bgImage = window.getComputedStyle(selectedElement).backgroundImage;
                     if (bgImage && bgImage !== 'none') {
                         input.value = bgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
+                    } else {
+                        input.value = '';
                     }
                 }
             }
 
-            // Position container
-            const rect = selectedElement.getBoundingClientRect();
-            const iframeRect = iframe.getBoundingClientRect();
-            container.style.left = `${iframeRect.left + rect.left}px`;
-            container.style.top = `${iframeRect.top + rect.bottom + 10}px`;
+            // Position container in center of iframe
+            container.style.left = `${iframeRect.left + (iframeRect.width / 2) - 175}px`;
+            container.style.top = `${iframeRect.top + 100}px`;
             container.classList.add('active');
 
             input.focus();
