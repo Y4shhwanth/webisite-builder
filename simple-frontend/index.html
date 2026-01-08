@@ -1285,12 +1285,12 @@
         // Auto-detect environment: use production URLs on Vercel, localhost for dev
         const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
 
-        // Production URLs - Same origin on Vercel (API at /api)
+        // Production URLs - Everything on Vercel
         const API_BASE = isProduction
-            ? ''  // Not used
+            ? ''  // Same origin
             : 'http://localhost:8000/api';
         const AI_BASE = isProduction
-            ? ''  // Same origin - API serverless function at /api
+            ? ''  // Same origin - API at /api
             : 'http://localhost:8001';
 
         // ========== STATE ==========
