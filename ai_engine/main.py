@@ -74,12 +74,19 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS middleware - Configure ALLOWED_ORIGINS env var in production
-import os
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+# CORS middleware - Allow Vercel frontend and localhost for development
+ALLOWED_ORIGINS = [
+    "https://webisite-builder.vercel.app",
+    "https://*.vercel.app",
+    "http://localhost:8080",
+    "http://localhost:3000",
+    "http://127.0.0.1:8080",
+    "http://127.0.0.1:3000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS if ALLOWED_ORIGINS != ["*"] else ["*"],
+    allow_origins=["*"],  # Allow all origins for now (Render free tier)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
