@@ -180,17 +180,21 @@ Always return valid, complete HTML."""
             "type": "function",
             "function": {
                 "name": "modify_class",
-                "description": "Add, remove, or replace CSS classes directly in the HTML. Best for Tailwind CSS class changes. This works by string replacement and doesn't require finding elements.",
+                "description": "Replace a CSS class on a SPECIFIC element (not globally). Use the selector from the TARGET ELEMENT section to change only that element's classes. ALWAYS provide a selector to avoid changing other elements.",
                 "parameters": {
                     "type": "object",
                     "properties": {
+                        "selector": {
+                            "type": "string",
+                            "description": "CSS selector to target the specific element (e.g., 'h1.hero-title', 'button.cta-primary:nth-of-type(1)'). Use the selector from TARGET ELEMENT section."
+                        },
                         "old_class": {
                             "type": "string",
-                            "description": "The class to find and replace (e.g., 'bg-primary', 'text-red-500')"
+                            "description": "The class to replace on this element (e.g., 'bg-blue-500', 'text-white')"
                         },
                         "new_class": {
                             "type": "string",
-                            "description": "The new class to use (e.g., 'bg-green-500', 'text-blue-500')"
+                            "description": "The new class to use (e.g., 'bg-green-500', 'text-red-500')"
                         }
                     },
                     "required": ["old_class", "new_class"]
@@ -454,24 +458,88 @@ Always return valid, complete HTML."""
                 )
 
             elif tool_name == "modify_class":
-                # Direct string replacement for CSS classes
+                # Targeted class replacement using BeautifulSoup
+                from bs4 import BeautifulSoup
+
+                selector = tool_input.get("selector", "")
                 old_class = tool_input.get("old_class", "")
                 new_class = tool_input.get("new_class", "")
-                logger.info(f"EditingAgent: modify_class - '{old_class}' -> '{new_class}'")
-                if old_class and new_class:
-                    if old_class in self.current_html:
-                        modified_html = self.current_html.replace(old_class, new_class)
-                        self.current_html = modified_html
-                        logger.info(f"EditingAgent: modify_class SUCCESS")
-                        return {
-                            "success": True,
-                            "html": modified_html,
-                            "message": f"Replaced class '{old_class}' with '{new_class}'"
-                        }
-                    else:
-                        logger.info(f"EditingAgent: modify_class FAILED - class not found")
-                        return {"success": False, "error": f"Class '{old_class}' not found in HTML"}
-                return {"success": False, "error": "Missing old_class or new_class"}
+
+                logger.info(f"EditingAgent: modify_class - selector='{selector}', '{old_class}' -> '{new_class}'")
+
+                if not old_class or not new_class:
+                    return {"success": False, "error": "Missing old_class or new_class"}
+
+                # If selector provided, use targeted replacement
+                if selector:
+                    try:
+                        soup = BeautifulSoup(self.current_html, 'html.parser')
+                        # Try to find element with selector
+                        element = soup.select_one(selector)
+
+                        if element:
+                            # Get current classes
+                            current_classes = element.get('class', [])
+                            if isinstance(current_classes, str):
+                                current_classes = current_classes.split()
+
+                            # Replace old_class with new_class
+                            if old_class in current_classes:
+                                new_classes = [new_class if c == old_class else c for c in current_classes]
+                                element['class'] = new_classes
+                                modified_html = str(soup)
+                                self.current_html = modified_html
+                                logger.info(f"EditingAgent: modify_class SUCCESS (targeted)")
+                                return {
+                                    "success": True,
+                                    "html": modified_html,
+                                    "message": f"Changed class '{old_class}' to '{new_class}' on element '{selector}'"
+                                }
+                            else:
+                                # Try to add the new class anyway (class might be from parent)
+                                current_classes.append(new_class)
+                                element['class'] = current_classes
+                                modified_html = str(soup)
+                                self.current_html = modified_html
+                                logger.info(f"EditingAgent: modify_class - added {new_class} (old class not found)")
+                                return {
+                                    "success": True,
+                                    "html": modified_html,
+                                    "message": f"Added class '{new_class}' to element '{selector}' ('{old_class}' was not on this element)"
+                                }
+                        else:
+                            logger.warning(f"EditingAgent: selector '{selector}' not found, falling back to global replace")
+                    except Exception as e:
+                        logger.warning(f"EditingAgent: BeautifulSoup selector failed: {e}, falling back to global replace")
+
+                # Fallback: global replacement (only if no selector or selector failed)
+                if old_class in self.current_html:
+                    # Try to do a more targeted replacement using the element's outer HTML
+                    outer_html = tool_input.get("outer_html", "")
+                    if outer_html and old_class in outer_html:
+                        new_outer_html = outer_html.replace(old_class, new_class)
+                        modified_html = self.current_html.replace(outer_html, new_outer_html)
+                        if modified_html != self.current_html:
+                            self.current_html = modified_html
+                            logger.info(f"EditingAgent: modify_class SUCCESS (outer_html targeted)")
+                            return {
+                                "success": True,
+                                "html": modified_html,
+                                "message": f"Replaced class '{old_class}' with '{new_class}' (targeted via outer_html)"
+                            }
+
+                    # Last resort: global replacement (will affect all elements with this class)
+                    modified_html = self.current_html.replace(old_class, new_class)
+                    self.current_html = modified_html
+                    logger.warning(f"EditingAgent: modify_class SUCCESS but GLOBAL (no selector provided)")
+                    return {
+                        "success": True,
+                        "html": modified_html,
+                        "message": f"WARNING: Replaced ALL '{old_class}' with '{new_class}' globally. Use selector for targeted changes."
+                    }
+                else:
+                    logger.info(f"EditingAgent: modify_class FAILED - class not found")
+                    return {"success": False, "error": f"Class '{old_class}' not found in HTML"}
 
             elif tool_name == "find_and_replace":
                 # Direct string replacement

@@ -199,10 +199,24 @@ def build_element_context(selected_element: dict) -> str:
 
 EDITING_RULES = """## QUICK REFERENCE FOR COMMON EDITS
 
-### Color Changes (Tailwind):
-- Text color: modify_class(old_class="text-white", new_class="text-red-500")
-- Background: modify_class(old_class="bg-primary", new_class="bg-green-500")
-- Border: modify_class(old_class="border-gray-200", new_class="border-blue-500")
+### ⚠️ CRITICAL: USE SELECTORS FOR TARGETED EDITS
+When changing a SPECIFIC element, ALWAYS provide the selector parameter!
+Otherwise, the change will apply to ALL elements with that class.
+
+### Color Changes (Tailwind) - ALWAYS USE SELECTOR:
+```
+modify_class(
+    selector="h1.hero-title",  // Target THIS specific element
+    old_class="text-white",
+    new_class="text-blue-500"
+)
+```
+
+BAD (affects ALL elements):
+- modify_class(old_class="text-white", new_class="text-red-500")
+
+GOOD (affects ONLY the target element):
+- modify_class(selector="h1.hero-title", old_class="text-white", new_class="text-red-500")
 
 ### IMPORTANT - Specific Color Names:
 When the user asks for a specific color like "blue", "red", "green", etc., use actual Tailwind colors:
@@ -227,9 +241,9 @@ DO NOT substitute "primary" or "accent" when the user asks for a specific color 
 - find_and_replace(find='class="existing-class"', replace='class="existing-class text-red-500"')
 
 ### REMEMBER:
-- ALWAYS use tools - don't just describe changes
+- ALWAYS use the selector from TARGET ELEMENT section
 - ALWAYS call finalize_edit when done
-- For Tailwind classes, use modify_class
+- For Tailwind class changes, use modify_class WITH SELECTOR
 - If one tool fails, try find_and_replace"""
 
 
