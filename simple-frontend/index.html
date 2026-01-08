@@ -1971,10 +1971,12 @@
         }
 
         function hideAllToolbars() {
-            document.getElementById('floatingToolbar').classList.remove('visible');
-            document.getElementById('imageToolbar').classList.remove('visible');
-            // Close the image URL modal if open
+            const floatingToolbar = document.getElementById('floatingToolbar');
+            const imageToolbar = document.getElementById('imageToolbar');
             const modal = document.getElementById('imageUrlModal');
+
+            if (floatingToolbar) floatingToolbar.classList.remove('visible');
+            if (imageToolbar) imageToolbar.classList.remove('visible');
             if (modal) modal.style.display = 'none';
         }
 
