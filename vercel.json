@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "name": "ai-website-builder",
+  "buildCommand": null,
+  "outputDirectory": "simple-frontend",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" }
+      ]
+    }
+  ]
+}
