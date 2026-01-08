@@ -1958,37 +1958,84 @@
             // Hide image toolbar first
             document.getElementById('imageToolbar').classList.remove('visible');
 
-            const container = document.getElementById('imageUrlContainer');
-            const input = document.getElementById('imageUrlInput');
-
-            if (!container) {
-                console.error('imageUrlContainer not found!');
-                alert('Error: Image URL container not found');
+            if (!selectedElement) {
+                showToast('No image selected', 'error');
                 return;
             }
 
             // Get current image URL
-            if (selectedElement) {
-                console.log('selectedElement:', selectedElement.tagName);
-                if (selectedElement.tagName.toLowerCase() === 'img') {
-                    input.value = selectedElement.src || '';
-                } else {
-                    // Background image
-                    const bgImage = window.getComputedStyle(selectedElement).backgroundImage;
-                    if (bgImage && bgImage !== 'none') {
-                        input.value = bgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
-                    } else {
-                        input.value = '';
-                    }
+            let currentUrl = '';
+            if (selectedElement.tagName.toLowerCase() === 'img') {
+                currentUrl = selectedElement.src || '';
+            } else {
+                const bgImage = window.getComputedStyle(selectedElement).backgroundImage;
+                if (bgImage && bgImage !== 'none') {
+                    currentUrl = bgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
                 }
             }
 
-            // Show the container
-            container.style.display = 'block';
-            console.log('Container display set to block');
+            // Use browser prompt for simplicity
+            const newUrl = prompt('Enter new image URL:', currentUrl);
 
-            input.focus();
-            input.select();
+            if (newUrl && newUrl !== currentUrl) {
+                replaceImageUrl(newUrl, currentUrl);
+            }
+        }
+
+        async function replaceImageUrl(newUrl, oldUrl) {
+            // Validate URL
+            try {
+                new URL(newUrl);
+            } catch {
+                showToast('Invalid URL format', 'error');
+                return;
+            }
+
+            showToast('Replacing image...', '');
+            htmlHistory.push(currentHTML);
+
+            if (selectedElement.tagName.toLowerCase() === 'img') {
+                // Direct image element - update src
+                selectedElement.src = newUrl;
+
+                // Update currentHTML
+                if (oldUrl) {
+                    currentHTML = currentHTML.replace(
+                        new RegExp(`src=["']${escapeRegExp(oldUrl)}["']`, 'g'),
+                        `src="${newUrl}"`
+                    );
+                }
+
+                updatePreviewFrame(currentHTML);
+                await syncHTML();
+                showToast('Image replaced!', 'success');
+            } else {
+                // Background image - use AI
+                try {
+                    const response = await fetch(`${AI_BASE}/api/edit/optimized`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            html: currentHTML,
+                            edit_instruction: `Change the background image of this element to "${newUrl}"`,
+                            design_context: designContext,
+                            selected_element: buildSelectedElementData()
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (data.html) {
+                        currentHTML = data.html;
+                        updatePreviewFrame(currentHTML);
+                        await syncHTML();
+                        showToast('Image replaced!', 'success');
+                    } else {
+                        showToast('Failed to replace image', 'error');
+                    }
+                } catch (error) {
+                    showToast(`Error: ${error.message}`, 'error');
+                }
+            }
         }
 
         function cancelImageUrlEdit() {
