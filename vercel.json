@@ -1,10 +1,8 @@
 {
-  "rewrites": [
-    { "source": "/api/:path*", "destination": "/api" },
-    { "source": "/(.*)", "destination": "/simple-frontend/$1" }
-  ],
+  "framework": null,
+  "outputDirectory": "simple-frontend",
   "functions": {
-    "api/index.py": {
+    "api/*.py": {
       "maxDuration": 60
     }
   }

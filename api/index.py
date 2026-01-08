@@ -50,16 +50,19 @@ class ChatMessageRequest(BaseModel):
 
 
 @app.get("/")
+@app.get("/api")
 async def root():
     return {"service": "AI Website Builder", "status": "running"}
 
 
 @app.get("/health")
+@app.get("/api/health")
 async def health():
     return {"status": "healthy", "openrouter_configured": bool(OPENROUTER_API_KEY)}
 
 
 @app.post("/api/build/website")
+@app.post("/build/website")
 async def build_website(data: BuildWebsiteRequest):
     """Generate a website from Topmate username"""
     if not OPENROUTER_API_KEY:
@@ -99,6 +102,7 @@ async def build_website(data: BuildWebsiteRequest):
 
 
 @app.post("/api/chat/init")
+@app.post("/chat/init")
 async def chat_init(data: ChatInitRequest):
     """Initialize a chat session"""
     import uuid
@@ -112,6 +116,7 @@ async def chat_init(data: ChatInitRequest):
 
 
 @app.post("/api/chat/message")
+@app.post("/chat/message")
 async def chat_message(data: ChatMessageRequest):
     """Process chat message and return edited HTML"""
     if not OPENROUTER_API_KEY:
