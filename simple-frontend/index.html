@@ -1973,9 +1973,9 @@
         function hideAllToolbars() {
             document.getElementById('floatingToolbar').classList.remove('visible');
             document.getElementById('imageToolbar').classList.remove('visible');
-            const urlContainer = document.getElementById('imageUrlContainer');
-            urlContainer.classList.remove('active');
-            urlContainer.style.display = 'none';
+            // Close the image URL modal if open
+            const modal = document.getElementById('imageUrlModal');
+            if (modal) modal.style.display = 'none';
         }
 
         // ========== IMAGE EDITING ==========
@@ -2099,9 +2099,7 @@
         }
 
         function cancelImageUrlEdit() {
-            const container = document.getElementById('imageUrlContainer');
-            container.classList.remove('active');
-            container.style.display = 'none';
+            closeImageModal();
         }
 
         async function saveImageUrl() {
