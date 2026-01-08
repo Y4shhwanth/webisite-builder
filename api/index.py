@@ -22,6 +22,12 @@ class handler(BaseHTTPRequestHandler):
             self._send_json({"service": "AI Website Builder", "status": "running"})
         elif path == '/api/health':
             self._send_json({"status": "healthy", "openrouter_configured": bool(OPENROUTER_API_KEY)})
+        elif path == '/api/build/website':
+            self._send_json({"error": "Use POST method", "endpoint": path})
+        elif path == '/api/chat/init':
+            self._send_json({"error": "Use POST method", "endpoint": path})
+        elif path == '/api/chat/message':
+            self._send_json({"error": "Use POST method", "endpoint": path})
         else:
             self._send_json({"error": "Not found", "path": path}, 404)
 
