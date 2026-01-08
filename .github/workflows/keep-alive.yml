@@ -1,0 +1,22 @@
+name: Keep Render Alive
+
+on:
+  schedule:
+    # Run every 14 minutes
+    - cron: '*/14 * * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render Health Endpoint
+        run: |
+          echo "Pinging Render service to keep it awake..."
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://webisite-builder-ejfr.onrender.com/health)
+          echo "Response status: $response"
+          if [ "$response" = "200" ]; then
+            echo "✓ Service is healthy"
+          else
+            echo "⚠ Service returned status $response"
+          fi
