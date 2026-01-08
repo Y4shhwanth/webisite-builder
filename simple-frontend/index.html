@@ -1285,12 +1285,12 @@
         // Auto-detect environment: use production URLs on Vercel, localhost for dev
         const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
 
-        // Production URLs
+        // Production URLs - Same origin on Vercel (API at /api)
         const API_BASE = isProduction
-            ? ''  // Django backend not used in this deployment
+            ? ''  // Not used
             : 'http://localhost:8000/api';
         const AI_BASE = isProduction
-            ? 'https://webisite-builder.onrender.com'  // Render AI Engine
+            ? ''  // Same origin - API serverless function at /api
             : 'http://localhost:8001';
 
         // ========== STATE ==========
