@@ -1626,6 +1626,69 @@
         let htmlHistory = [];
         let designContext = null;  // Store design context (fonts, colors, sections)
 
+        // ========== DESIGN CONTEXT EXTRACTION ==========
+        function extractDesignContext(html) {
+            if (!html) {
+                designContext = null;
+                return;
+            }
+
+            try {
+                // Create a temporary DOM to parse HTML
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+
+                // Extract fonts from Google Fonts links or font-family styles
+                const fonts = { display: null, body: null, all_fonts: [] };
+                const fontLinks = doc.querySelectorAll('link[href*="fonts.googleapis.com"]');
+                fontLinks.forEach(link => {
+                    const href = link.href || '';
+                    const familyMatch = href.match(/family=([^&:]+)/);
+                    if (familyMatch) {
+                        const fontName = decodeURIComponent(familyMatch[1]).replace(/\+/g, ' ');
+                        fonts.all_fonts.push(fontName);
+                        if (!fonts.display) fonts.display = fontName;
+                        else if (!fonts.body) fonts.body = fontName;
+                    }
+                });
+
+                // Extract colors from Tailwind classes and CSS variables
+                const colors = { primary: null, accent: null, background: null, text: null };
+                const bodyClasses = doc.body?.className || '';
+
+                // Check for common color patterns in body/main sections
+                const bgMatch = bodyClasses.match(/bg-(\w+-\d+|white|black|gray-\d+)/);
+                if (bgMatch) colors.background = bgMatch[0];
+
+                // Extract sections
+                const sections = [];
+                doc.querySelectorAll('section, header, footer, main, nav').forEach(el => {
+                    sections.push({
+                        tag: el.tagName.toLowerCase(),
+                        type: el.id || el.className.split(' ')[0] || el.tagName.toLowerCase()
+                    });
+                });
+
+                // Build design context
+                designContext = {
+                    fonts: fonts,
+                    colors: colors,
+                    sections: sections,
+                    tokens: {
+                        spacing_strategy: 'tailwind',
+                        border_radius: 'rounded',
+                        shadow_style: 'shadow'
+                    },
+                    template_id: 'custom'
+                };
+
+                console.log('Extracted design context:', designContext);
+            } catch (error) {
+                console.error('Error extracting design context:', error);
+                designContext = null;
+            }
+        }
+
         // ========== PREVIEW UPDATE ==========
         function updatePreviewFrame(html) {
             console.log('updatePreviewFrame called, html length:', html?.length);

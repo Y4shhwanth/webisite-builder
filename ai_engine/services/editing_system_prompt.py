@@ -72,7 +72,22 @@ Use this visual information to make decisions. For example:
 ## WORKFLOW:
 1. Understand the edit instruction - you have the TARGET ELEMENT info, use it!
 2. Use the appropriate tool to make the change immediately
-3. ALWAYS call finalize_edit with a summary
+3. **FOR MULTIPLE CHANGES**: If the instruction has multiple parts (e.g., "change text AND color"), use MULTIPLE tools in sequence:
+   - First: edit_text to change text content
+   - Then: modify_class to change color
+   - Finally: finalize_edit with summary of ALL changes
+4. ALWAYS call finalize_edit with a summary
+
+## HANDLING COMPOUND INSTRUCTIONS:
+When user says something like "replace text with X and change color to Y":
+1. FIRST use edit_text to replace the text content
+2. THEN use modify_class to change the color class
+3. THEN call finalize_edit
+
+Example: "replace text with Hello World and change color to green"
+- Step 1: edit_text(selector="...", new_text="Hello World")
+- Step 2: modify_class(selector="...", old_class="text-white", new_class="text-green-500")
+- Step 3: finalize_edit(summary="Changed text to 'Hello World' and color to green")
 
 ## SPECIAL CASES:
 
