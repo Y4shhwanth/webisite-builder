@@ -1342,7 +1342,7 @@
 
     <!-- Floating Image Toolbar (for images) -->
     <div class="floating-toolbar" id="imageToolbar">
-        <button class="toolbar-btn" onclick="openImageUrlEdit()">Replace URL</button>
+        <button class="toolbar-btn" onclick="openImageReplaceChat()">Replace URL</button>
         <button class="toolbar-btn" onclick="imageAction('resize')">Resize</button>
         <button class="toolbar-btn" onclick="imageAction('round')">Round Corners</button>
         <div class="toolbar-divider"></div>
@@ -2024,10 +2024,10 @@
         let currentImageUrl = '';
         let lastSelectedImage = null;  // Store the last selected image element
 
-        function openImageUrlEdit() {
-            console.log('openImageUrlEdit called');
+        function openImageReplaceChat() {
+            console.log('openImageReplaceChat called');
 
-            // Hide image toolbar first
+            // Hide image toolbar
             const imageToolbar = document.getElementById('imageToolbar');
             if (imageToolbar) imageToolbar.classList.remove('visible');
 
@@ -2039,34 +2039,41 @@
                 return;
             }
 
-            // Make sure we're working with the image
+            // Store the image for the chat
             selectedElement = imageElement;
 
-            // Get current image URL
-            currentImageUrl = '';
+            // Get current image URL for context
+            let currentUrl = '';
             try {
-                if (selectedElement.tagName && selectedElement.tagName.toLowerCase() === 'img') {
-                    currentImageUrl = selectedElement.src || '';
-                } else {
-                    const iframe = document.getElementById('previewFrame');
-                    const iframeWindow = iframe.contentWindow;
-                    const bgImage = iframeWindow.getComputedStyle(selectedElement).backgroundImage;
-                    if (bgImage && bgImage !== 'none') {
-                        currentImageUrl = bgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
-                    }
+                if (selectedElement.tagName?.toLowerCase() === 'img') {
+                    currentUrl = selectedElement.src || '';
                 }
             } catch (e) {
                 console.log('Error getting image URL:', e);
             }
 
-            // Use browser prompt for reliability - modal has z-index issues with iframe
-            const newUrl = prompt('Enter new image URL:', currentImageUrl);
-
-            if (newUrl && newUrl.trim()) {
-                if (newUrl.trim() !== currentImageUrl) {
-                    replaceImageUrlDirect(newUrl.trim(), currentImageUrl);
-                }
+            // Open the chat panel
+            const chatPanel = document.querySelector('.chat-panel');
+            if (chatPanel && chatPanel.classList.contains('collapsed')) {
+                toggleChatPanel();
             }
+
+            // Focus on chat input and add helper text
+            const chatInput = document.getElementById('chatInput');
+            if (chatInput) {
+                chatInput.value = 'Replace this image with: ';
+                chatInput.focus();
+                // Move cursor to end
+                chatInput.setSelectionRange(chatInput.value.length, chatInput.value.length);
+            }
+
+            // Show helper message
+            addChatMessage('assistant', `📷 **Image selected!** Enter the new image URL after "Replace this image with:" and press Enter.\n\nCurrent image: \`${currentUrl.substring(0, 50)}...\``);
+        }
+
+        function openImageUrlEdit() {
+            // Redirect to chat-based replacement
+            openImageReplaceChat();
         }
 
         function closeImageModal() {
@@ -2592,6 +2599,59 @@
             addChatMessage('user', message);
             input.value = '';
 
+            // If website exists, send ALL messages to edit API directly
+            // The AI editing agent is smart enough to handle any instruction
+            const hasWebsite = !!currentHTML && currentHTML.length > 100;
+
+            console.log('=== SEND CHAT MESSAGE ===');
+            console.log('Message:', message);
+            console.log('hasWebsite:', hasWebsite);
+
+            if (hasWebsite) {
+                console.log('>>> DIRECT EDIT MODE - sending to /api/edit/optimized');
+                // Direct edit - bypass chatbot and call edit API
+                const typingId = addChatMessage('assistant', '🔄 Applying edit...', false);
+
+                try {
+                    document.getElementById('previewFrame').style.opacity = '0.5';
+
+                    const response = await fetch(`${AI_BASE}/api/edit/optimized`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            html: currentHTML,
+                            edit_instruction: message,
+                            design_context: designContext,
+                            selected_element: buildSelectedElementData()
+                        })
+                    });
+
+                    console.log('Edit response status:', response.status);
+                    const data = await response.json();
+                    console.log('Edit response data:', JSON.stringify(data).substring(0, 500));
+                    document.getElementById('previewFrame').style.opacity = '1';
+
+                    if (data.success && data.html) {
+                        console.log('Edit SUCCESS - HTML changed, length:', data.html.length);
+                        htmlHistory.push(currentHTML);
+                        currentHTML = data.html;
+                        updatePreviewFrame(currentHTML);
+                        await syncHTML();
+                        updateChatMessage(typingId, `✅ Done! ${data.summary || 'Edit applied successfully.'}`);
+                        showToast('Edit applied!', 'success');
+                    } else {
+                        updateChatMessage(typingId, `❌ Edit failed: ${data.error || 'Unknown error'}`);
+                        showToast('Edit failed', 'error');
+                    }
+                } catch (error) {
+                    document.getElementById('previewFrame').style.opacity = '1';
+                    updateChatMessage(typingId, `❌ Error: ${error.message}`);
+                    showToast('Edit failed', 'error');
+                }
+                return;
+            }
+
+            // Regular chat message - use chatbot
             const typingId = addChatMessage('assistant', '', true);
 
             try {
@@ -2603,6 +2663,7 @@
                         message: message,
                         context: {
                             selected_component: selectedComponent?.selector,
+                            selected_element: buildSelectedElementData(),
                             has_html: !!currentHTML
                         }
                     })

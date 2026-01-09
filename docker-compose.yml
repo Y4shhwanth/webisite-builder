@@ -94,6 +94,8 @@ services:
       - SENTRY_DSN=${SENTRY_DSN:-}
       - SENTRY_ENVIRONMENT=development
       - SENTRY_TRACES_SAMPLE_RATE=0.1
+      - BROWSERBASE_API_KEY=${BROWSERBASE_API_KEY:-}
+      - BROWSERBASE_PROJECT_ID=${BROWSERBASE_PROJECT_ID:-}
     ports:
       - "8001:8001"
     volumes:

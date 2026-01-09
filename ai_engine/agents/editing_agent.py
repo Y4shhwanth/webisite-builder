@@ -8,9 +8,11 @@ This agent can:
 - Handle complex multi-step editing tasks
 - Maintain design consistency using design context
 - Use Browserbase for cloud browser automation with visual verification
+- Use screenshots as visual context to make accurate edits without asking questions
 """
 from typing import List, Dict, Any, Optional
 import json
+import base64
 import httpx
 from logging_config import logger
 from config import settings
@@ -264,6 +266,60 @@ Always return valid, complete HTML."""
         logger.info(f"Initialized EditingAgent with model: {self.model}")
         logger.info(f"Browserbase available: {self.use_browserbase}")
 
+    def _build_message_with_visual_context(
+        self,
+        user_prompt: str,
+        screenshot: Optional[bytes] = None
+    ) -> Any:
+        """
+        Build a message with visual context from screenshot.
+
+        If a screenshot is available, creates a multi-part message with both
+        text and image content. This gives the AI visual context so it can
+        make accurate edits without asking questions.
+
+        Args:
+            user_prompt: The text prompt with edit instruction and HTML
+            screenshot: Optional screenshot bytes from Browserbase
+
+        Returns:
+            String (text only) or list (multi-part with image)
+        """
+        if not screenshot:
+            return user_prompt
+
+        try:
+            # Encode screenshot as base64
+            screenshot_b64 = base64.b64encode(screenshot).decode('utf-8')
+
+            # Create multi-part message with image and text
+            # Note: Claude models support vision through OpenRouter
+            return [
+                {
+                    "type": "text",
+                    "text": f"""## VISUAL CONTEXT
+I've captured a screenshot of the current page. Use this to understand:
+- What the page looks like visually
+- Where elements are positioned
+- Current colors, fonts, and styling
+- The overall design aesthetic
+
+DO NOT ask questions about the design - you can SEE it in the screenshot.
+Make your best judgment based on this visual context.
+
+{user_prompt}"""
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{screenshot_b64}"
+                    }
+                }
+            ]
+        except Exception as e:
+            logger.warning(f"Failed to encode screenshot: {e}")
+            return user_prompt
+
     async def edit(
         self,
         html: str,
@@ -321,15 +377,22 @@ Always return valid, complete HTML."""
                 selected_element=selected_element
             )
 
-            # Build user prompt with HTML
+            # Build user prompt with HTML and selected element
             user_prompt = build_user_prompt(
                 instruction=instruction,
                 html=html,
-                design_context=design_context
+                design_context=design_context,
+                selected_element=selected_element
+            )
+
+            # Build the initial message with visual context if screenshot available
+            initial_message_content = self._build_message_with_visual_context(
+                user_prompt=user_prompt,
+                screenshot=self.screenshots[0] if self.screenshots else None
             )
 
             # Run agent with tools
-            messages = [{"role": "user", "content": user_prompt}]
+            messages = [{"role": "user", "content": initial_message_content}]
             iteration = 0
             final_html = html
             edit_summary = ""

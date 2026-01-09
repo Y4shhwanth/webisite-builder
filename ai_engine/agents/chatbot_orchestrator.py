@@ -65,19 +65,33 @@ When generating a section: [ACTION: GENERATE_SECTION - section_name]
 When complete: [ACTION: SECTION_COMPLETE - section_name]"""
 
 
-FREEFORM_AGENT_PROMPT = """You are an AI website building and editing assistant.
+FREEFORM_AGENT_PROMPT = """You are an AI website editing assistant. Your job is to EXECUTE edits immediately, not ask questions.
 
-You can help with:
-- Modifying colors, fonts, layouts, content
-- Adding or removing sections
-- Editing specific text or elements
-- Suggesting improvements
+## CRITICAL RULES:
+1. **NEVER ASK QUESTIONS** - You have all the context you need. Just do it.
+2. **ALWAYS USE ACTIONS** - Every response must include an [ACTION:] command
+3. **BE CONCISE** - Short responses, no long explanations
+4. **MAKE DECISIONS** - If something is ambiguous, make your best judgment
 
-For edits: [ACTION: EDIT_WEBSITE - description of the edit]
-For adding sections: [ACTION: ADD_SECTION - section_type]
-For removing: [ACTION: REMOVE_ELEMENT - element_description]
+## AVAILABLE ACTIONS:
+- [ACTION: EDIT_WEBSITE - description] - For any visual/content changes
+- [ACTION: ADD_SECTION - section_type] - Add new sections
+- [ACTION: REMOVE_ELEMENT - element_description] - Remove elements
 
-Always explain what you're doing."""
+## EXAMPLES:
+User: "make it darker"
+Response: Making the background darker. [ACTION: EDIT_WEBSITE - Change background to a darker shade]
+
+User: "change the color to blue"
+Response: Changing to blue. [ACTION: EDIT_WEBSITE - Change color to blue]
+
+User: "replace image with https://example.com/img.jpg"
+Response: Replacing image. [ACTION: EDIT_WEBSITE - Replace image src with https://example.com/img.jpg]
+
+## IMPORTANT:
+- Do NOT ask "which element?" - use the selected element context
+- Do NOT ask "what shade?" - pick a reasonable default
+- Do NOT explain options - just execute the most likely intent"""
 
 
 SUGGESTION_PROMPTS = {
@@ -219,12 +233,31 @@ class ChatbotOrchestrator:
         if state.selected_template:
             prompt_parts.append(f"SELECTED TEMPLATE: {state.selected_template}")
 
-        # Add context about selected component
-        if context and context.get("selected_component"):
-            prompt_parts.append(f"SELECTED COMPONENT: {context['selected_component']}")
+        # Add context about selected element (IMPORTANT for edits)
+        if context:
+            if context.get("selected_element"):
+                elem = context["selected_element"]
+                elem_info = []
+                if elem.get("selector"):
+                    elem_info.append(f"Selector: {elem['selector']}")
+                if elem.get("tag"):
+                    elem_info.append(f"Tag: <{elem['tag']}>")
+                if elem.get("classes"):
+                    classes = elem["classes"] if isinstance(elem["classes"], str) else " ".join(elem["classes"])
+                    elem_info.append(f"Classes: {classes}")
+                if elem.get("text"):
+                    elem_info.append(f"Text: {elem['text'][:100]}")
+
+                prompt_parts.append(f"SELECTED ELEMENT (apply edits to THIS element):\n" + "\n".join(elem_info))
+
+            if context.get("selected_component"):
+                prompt_parts.append(f"SELECTED COMPONENT: {context['selected_component']}")
 
         # Add current message
         prompt_parts.append(f"USER MESSAGE: {message}")
+
+        # Reminder to not ask questions
+        prompt_parts.append("REMINDER: Do NOT ask questions. Just execute the edit based on the context above.")
 
         return "\n\n".join(prompt_parts)
 
@@ -332,8 +365,13 @@ class ChatbotOrchestrator:
         """Extract executable actions from response"""
         actions = []
 
+        # Log the response for debugging
+        logger.info(f"Extracting actions from response: {response[:500]}...")
+
         pattern = r'\[ACTION:\s*(\w+)\s*-\s*(.+?)\]'
         matches = re.findall(pattern, response)
+
+        logger.info(f"Found {len(matches)} action matches")
 
         for action_type, action_data in matches:
             actions.append({
@@ -341,6 +379,11 @@ class ChatbotOrchestrator:
                 "data": action_data.strip()
             })
             logger.info(f"Extracted action: {action_type} - {action_data}")
+
+        # If no actions found but response contains edit-like content, create one
+        if not actions and any(kw in response.lower() for kw in ['change', 'update', 'modify', 'replace', 'make']):
+            # The AI didn't use the [ACTION:] format, but described an edit
+            logger.warning(f"AI response contains edit intent but no [ACTION:] tag. Response: {response[:200]}")
 
         return actions
 
