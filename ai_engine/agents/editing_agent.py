@@ -291,7 +291,7 @@ Always return valid, complete HTML."""
         self.playwright_url = settings.PLAYWRIGHT_SERVICE_URL
         self.current_html = ""
         self.selected_element = None  # Store for auto-injection in tools
-        self.max_iterations = 8  # Increased for complex edits
+        self.max_iterations = 5  # Balanced for speed and complex edits
         self.temperature = 0.2  # Lower for more consistent edits
 
         # Browserbase integration (cloud browser)
@@ -391,23 +391,23 @@ Make your best judgment based on this visual context.
             self.screenshots = []  # Reset screenshots for this edit session
             self.session_replay_url = None
 
-            # Initialize Browserbase session if available
+            # Skip Browserbase by default for faster edits - use local Playwright
+            # Browserbase can be enabled for debugging or visual verification if needed
             browserbase_page = None
-            if self.use_browserbase:
-                try:
-                    browserbase_page = await self.browserbase.connect()
-                    if browserbase_page:
-                        await self.browserbase.load_html(html)
-                        self.session_replay_url = self.browserbase.get_session_replay_url()
-                        logger.info(f"EditingAgent: Browserbase session ready - {self.session_replay_url}")
-
-                        # Capture initial screenshot
-                        initial_screenshot = await self.browserbase.screenshot()
-                        if initial_screenshot:
-                            self.screenshots.append(initial_screenshot)
-                except Exception as e:
-                    logger.warning(f"EditingAgent: Browserbase init failed, using local Playwright: {e}")
-                    browserbase_page = None
+            # Disabled for performance - uncomment below to enable Browserbase
+            # if self.use_browserbase:
+            #     try:
+            #         browserbase_page = await self.browserbase.connect()
+            #         if browserbase_page:
+            #             await self.browserbase.load_html(html)
+            #             self.session_replay_url = self.browserbase.get_session_replay_url()
+            #             logger.info(f"EditingAgent: Browserbase session ready - {self.session_replay_url}")
+            #             initial_screenshot = await self.browserbase.screenshot()
+            #             if initial_screenshot:
+            #                 self.screenshots.append(initial_screenshot)
+            #     except Exception as e:
+            #         logger.warning(f"EditingAgent: Browserbase init failed: {e}")
+            #         browserbase_page = None
 
             # Log what we received
             logger.info(f"EditingAgent: Instruction = '{instruction}'")

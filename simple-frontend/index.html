@@ -3344,7 +3344,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
             htmlHistory = [currentHTML];
             document.getElementById('welcomeScreenNew').style.display = 'none';
             updatePreviewFrameNew(currentHTML);
-            extractDesignContext(currentHTML);
+            try { if (typeof extractDesignContext === 'function') extractDesignContext(currentHTML); } catch(e) { console.warn('Design context skipped:', e); }
             addChatMessageNew('assistant', '✅ HTML loaded! Click on any element to select it, then tell me what to change.');
         }
 
@@ -3420,7 +3420,8 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                             htmlHistory.push(currentHTML);
                             currentHTML = data.html;
                             updatePreviewFrameNew(currentHTML);
-                            extractDesignContext(currentHTML);  // Re-extract design context
+                            // Design context extraction is optional - don't block on it
+                            try { if (typeof extractDesignContext === 'function') extractDesignContext(currentHTML); } catch(e) { console.warn('Design context extraction skipped:', e); }
                             loadingMsg.querySelector('.chat-message-content').textContent = `✅ ${data.summary || 'Done!'}`;
                         } else {
                             console.warn('Edit returned same HTML - no change detected');
@@ -3469,7 +3470,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                     htmlHistory = [currentHTML];
                     document.getElementById('previewUrl').textContent = `${username}.topmate.io`;
                     updatePreviewFrameNew(currentHTML);
-                    extractDesignContext(currentHTML);
+                    try { if (typeof extractDesignContext === 'function') extractDesignContext(currentHTML); } catch(e) { console.warn('Design context skipped:', e); }
                     loadingMsg.querySelector('.chat-message-content').textContent = '✅ Website created! Click on any element to select it, then tell me what to change.';
                 } else {
                     loadingMsg.querySelector('.chat-message-content').textContent = `❌ ${data.error || 'Failed to generate'}`;
@@ -3491,7 +3492,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                 htmlHistory = [currentHTML];
                 document.getElementById('welcomeScreenNew').style.display = 'none';
                 updatePreviewFrameNew(currentHTML);
-                extractDesignContext(currentHTML);
+                try { if (typeof extractDesignContext === 'function') extractDesignContext(currentHTML); } catch(e) { console.warn('Design context skipped:', e); }
                 addChatMessageNew('assistant', '✅ HTML uploaded! Click on any element to select it, then tell me what to change.');
             };
             reader.readAsText(file);
