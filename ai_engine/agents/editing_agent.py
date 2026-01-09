@@ -291,8 +291,8 @@ Always return valid, complete HTML."""
         self.playwright_url = settings.PLAYWRIGHT_SERVICE_URL
         self.current_html = ""
         self.selected_element = None  # Store for auto-injection in tools
-        self.max_iterations = 5
-        self.temperature = 0.3
+        self.max_iterations = 8  # Increased for complex edits
+        self.temperature = 0.2  # Lower for more consistent edits
 
         # Browserbase integration (cloud browser)
         self.browserbase: BrowserbaseService = get_browserbase_service()
@@ -644,24 +644,34 @@ Make your best judgment based on this visual context.
                 return await self._analyze_dom(tool_input.get("html", self.current_html))
 
             elif tool_name == "edit_text":
-                return await self._edit_with_fallback(
-                    html=tool_input.get("html", self.current_html),
+                result = await self._edit_with_fallback(
+                    html=self.current_html,  # Always use current state
                     selector=get_selector(),
                     edit_type="text",
                     edit_value=tool_input.get("new_text")
                 )
+                # Update current_html if successful
+                if result.get("success") and result.get("html"):
+                    self.current_html = result["html"]
+                    logger.info(f"EditingAgent: edit_text SUCCESS - updated self.current_html")
+                return result
 
             elif tool_name == "edit_style":
-                return await self._edit_with_fallback(
-                    html=tool_input.get("html", self.current_html),
+                result = await self._edit_with_fallback(
+                    html=self.current_html,  # Always use current state
                     selector=get_selector(),
                     edit_type="style",
                     edit_value=tool_input.get("styles")
                 )
+                # Update current_html if successful
+                if result.get("success") and result.get("html"):
+                    self.current_html = result["html"]
+                    logger.info(f"EditingAgent: edit_style SUCCESS - updated self.current_html")
+                return result
 
             elif tool_name == "edit_attribute":
-                return await self._edit_with_fallback(
-                    html=tool_input.get("html", self.current_html),
+                result = await self._edit_with_fallback(
+                    html=self.current_html,  # Always use current state
                     selector=get_selector(),
                     edit_type="attribute",
                     edit_value={
@@ -669,14 +679,24 @@ Make your best judgment based on this visual context.
                         "value": tool_input.get("value")
                     }
                 )
+                # Update current_html if successful
+                if result.get("success") and result.get("html"):
+                    self.current_html = result["html"]
+                    logger.info(f"EditingAgent: edit_attribute SUCCESS - updated self.current_html")
+                return result
 
             elif tool_name == "replace_element":
-                return await self._edit_with_fallback(
-                    html=tool_input.get("html", self.current_html),
+                result = await self._edit_with_fallback(
+                    html=self.current_html,  # Always use current state
                     selector=get_selector(),
                     edit_type="replace",
                     edit_value=tool_input.get("new_html")
                 )
+                # Update current_html if successful
+                if result.get("success") and result.get("html"):
+                    self.current_html = result["html"]
+                    logger.info(f"EditingAgent: replace_element SUCCESS - updated self.current_html")
+                return result
 
             elif tool_name == "modify_class":
                 # Targeted class replacement using BeautifulSoup
@@ -722,6 +742,30 @@ Make your best judgment based on this visual context.
                                 "message": f"Changed class '{old_class}' to '{new_class}' on EXACT selected element"
                             }
                     else:
+                        # Try with normalized whitespace
+                        import re
+                        normalized_outer = re.sub(r'\s+', ' ', outer_html.strip())
+                        normalized_html = re.sub(r'\s+', ' ', self.current_html)
+
+                        if normalized_outer in normalized_html:
+                            # Find and replace in original HTML using fuzzy match
+                            # Find a unique substring from outer_html that exists in current_html
+                            class_pattern = re.escape(f'class="') + r'[^"]*' + re.escape(old_class) + r'[^"]*' + re.escape('"')
+                            match = re.search(class_pattern, outer_html)
+                            if match:
+                                old_class_attr = match.group(0)
+                                new_class_attr = old_class_attr.replace(old_class, new_class)
+                                if old_class_attr in self.current_html:
+                                    modified_html = self.current_html.replace(old_class_attr, new_class_attr, 1)
+                                    if modified_html != self.current_html:
+                                        self.current_html = modified_html
+                                        logger.info(f"EditingAgent: modify_class SUCCESS (class attr replacement)")
+                                        return {
+                                            "success": True,
+                                            "html": modified_html,
+                                            "message": f"Changed class '{old_class}' to '{new_class}' via class attribute"
+                                        }
+
                         logger.warning(f"EditingAgent: outer_html exact match not found, trying fingerprint method")
 
                 # METHOD 1B: Text content fingerprint targeting

@@ -2750,29 +2750,60 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         html: currentHTML,
-                        edit_instruction: `Restructure and fix the website layout after content changes:
-1. Fix any text that overlaps or breaks out of its container
-2. Adjust spacing (padding, margins) so all content fits properly
-3. Ensure consistent gaps between sections and elements
-4. Fix any elements that look cramped or have too much empty space
-5. Maintain responsive design - ensure it still works on mobile
-6. Keep the same visual style and colors, just fix the structure
+                        edit_instruction: `CRITICAL: Fix the website layout WITHOUT changing any text content, colors, or design:
 
-Do NOT change colors, fonts, or the overall design aesthetic. Only fix spacing and layout issues.`,
-                        design_context: designContext
+## WHAT TO FIX:
+1. Text overflow issues - if any text is breaking out of its container, add appropriate Tailwind classes:
+   - Use 'break-words' or 'overflow-hidden' for containers
+   - Use 'truncate' if text should be clipped with ellipsis
+   - Use 'whitespace-normal' to allow text wrapping
+
+2. Container width issues - ensure containers constrain their content:
+   - Add 'max-w-full' or specific max-width classes
+   - Use 'w-full' with parent constraints
+
+3. Spacing problems - fix padding and margins:
+   - Adjust p-* and m-* classes for proper spacing
+   - Ensure consistent gaps between elements (gap-4, gap-6, etc.)
+
+4. Flex/Grid layout fixes:
+   - Add 'flex-wrap' if items should wrap
+   - Use 'items-start' or 'items-center' for alignment
+   - Adjust 'justify-*' for horizontal distribution
+
+## WHAT NOT TO CHANGE:
+- Do NOT change any text content (words, sentences)
+- Do NOT change colors (bg-*, text-*, border-*)
+- Do NOT change fonts or font sizes
+- Do NOT remove any elements
+- Do NOT change images or links
+
+Use find_and_replace or modify_class to make these structural fixes.`,
+                        design_context: designContext,
+                        use_browserbase: true
                     })
                 });
 
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+
                 const data = await response.json();
 
-                if (data.html) {
+                if (data.success && data.html && data.html !== currentHTML) {
                     htmlHistory.push(currentHTML);
                     currentHTML = data.html;
                     updatePreviewFrame(currentHTML);
+                    updatePreviewFrameNew(currentHTML);
                     await syncHTML();
-                    showToast('Layout restructured!', 'success');
+                    showToast('Layout fixed!', 'success');
+                } else if (data.html === currentHTML) {
+                    showToast('No layout issues found', '');
+                } else {
+                    showToast(data.error || 'Could not fix layout', 'error');
                 }
             } catch (error) {
+                console.error('Fix layout error:', error);
                 showToast(`Error: ${error.message}`, 'error');
             }
         }
@@ -2781,7 +2812,9 @@ Do NOT change colors, fonts, or the overall design aesthetic. Only fix spacing a
             if (htmlHistory.length > 1) {
                 htmlHistory.pop();
                 currentHTML = htmlHistory[htmlHistory.length - 1];
+                // Update both old and new preview frames (whichever is active)
                 updatePreviewFrame(currentHTML);
+                updatePreviewFrameNew(currentHTML);
                 syncHTML();
                 showToast('Undone', 'success');
             } else {
@@ -3282,6 +3315,20 @@ Do NOT change colors, fonts, or the overall design aesthetic. Only fix spacing a
 
             try {
                 if (currentHTML && currentHTML.length > 100) {
+                    // Build selected element context with maximum info
+                    let selectedElementData = null;
+                    if (selectedComponent) {
+                        selectedElementData = {
+                            selector: selectedComponent.selector,
+                            tag: selectedComponent.tag,
+                            classes: selectedComponent.classes,
+                            text: selectedComponent.text,
+                            outer_html: selectedComponent.outer_html,
+                            color_classes: selectedComponent.color_classes
+                        };
+                        console.log('Sending edit with selected element:', selectedElementData);
+                    }
+
                     // Edit existing website
                     const response = await fetch(`${AI_BASE}/api/edit/optimized`, {
                         method: 'POST',
@@ -3290,30 +3337,41 @@ Do NOT change colors, fonts, or the overall design aesthetic. Only fix spacing a
                             html: currentHTML,
                             edit_instruction: message,
                             design_context: designContext,
-                            selected_element: selectedComponent ? {
-                                selector: selectedComponent.selector,
-                                tag: selectedComponent.tag,
-                                classes: selectedComponent.classes,
-                                text: selectedComponent.text,
-                                outer_html: selectedComponent.outer_html,
-                                color_classes: selectedComponent.color_classes
-                            } : null
+                            selected_element: selectedElementData,
+                            use_browserbase: true  // Enable Browserbase for visual verification
                         })
                     });
 
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('Edit API error:', response.status, errorText);
+                        throw new Error(`Server error: ${response.status}`);
+                    }
+
                     const data = await response.json();
+                    console.log('Edit response:', data.success, 'HTML length:', data.html?.length);
+
                     if (data.success && data.html) {
-                        htmlHistory.push(currentHTML);
-                        currentHTML = data.html;
-                        updatePreviewFrameNew(currentHTML);
-                        loadingMsg.querySelector('.chat-message-content').textContent = `✅ ${data.summary || 'Done!'}`;
+                        // Verify HTML actually changed
+                        if (data.html !== currentHTML) {
+                            htmlHistory.push(currentHTML);
+                            currentHTML = data.html;
+                            updatePreviewFrameNew(currentHTML);
+                            extractDesignContext(currentHTML);  // Re-extract design context
+                            loadingMsg.querySelector('.chat-message-content').textContent = `✅ ${data.summary || 'Done!'}`;
+                        } else {
+                            console.warn('Edit returned same HTML - no change detected');
+                            loadingMsg.querySelector('.chat-message-content').textContent = '⚠️ No changes detected. Try being more specific about what to change.';
+                        }
                     } else {
-                        loadingMsg.querySelector('.chat-message-content').textContent = `❌ ${data.error || 'Failed'}`;
+                        console.error('Edit failed:', data.error);
+                        loadingMsg.querySelector('.chat-message-content').textContent = `❌ ${data.error || 'Edit failed - try again'}`;
                     }
                 } else {
                     loadingMsg.querySelector('.chat-message-content').textContent = '💡 Generate a website first, then I can help you edit it!';
                 }
             } catch (error) {
+                console.error('Edit error:', error);
                 loadingMsg.querySelector('.chat-message-content').textContent = `❌ Error: ${error.message}`;
             }
         }
