@@ -13,35 +13,38 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: #f5f5f5;
+            background: #0f0f0f;
             min-height: 100vh;
+            color: #fff;
         }
 
-        /* ========== MAIN LAYOUT ========== */
+        /* ========== LOVABLE-STYLE LAYOUT ========== */
         .app-container {
             display: flex;
             height: 100vh;
-        }
-
-        .main-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
             overflow: hidden;
         }
 
-        /* ========== TOP BAR ========== */
-        .top-bar {
-            height: 56px;
-            background: white;
-            border-bottom: 1px solid #e5e5e5;
+        /* LEFT PANEL - Chat */
+        .chat-panel {
+            width: 400px;
+            min-width: 400px;
+            background: #1a1a1a;
+            border-right: 1px solid #2a2a2a;
             display: flex;
-            align-items: center;
-            padding: 0 20px;
-            gap: 15px;
+            flex-direction: column;
+            height: 100vh;
         }
 
-        .logo {
+        .chat-panel-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #2a2a2a;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .chat-panel-logo {
             font-weight: 700;
             font-size: 18px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -49,27 +52,177 @@
             -webkit-text-fill-color: transparent;
         }
 
-        .top-bar-divider {
-            width: 1px;
-            height: 24px;
-            background: #e5e5e5;
+        .chat-panel-title {
+            font-size: 13px;
+            color: #888;
         }
 
-        .project-name {
-            font-size: 14px;
-            color: #333;
-        }
-
-        .top-bar-spacer {
+        .chat-messages-container {
             flex: 1;
+            overflow-y: auto;
+            padding: 20px;
         }
 
-        .top-bar-actions {
+        .chat-message {
+            margin-bottom: 16px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .chat-message.user {
             display: flex;
-            gap: 10px;
-            align-items: center;
+            justify-content: flex-end;
         }
 
+        .chat-message.user .chat-message-content {
+            background: #2563eb;
+            color: white;
+            border-radius: 16px 16px 4px 16px;
+            max-width: 85%;
+        }
+
+        .chat-message.assistant .chat-message-content {
+            background: #2a2a2a;
+            color: #e5e5e5;
+            border-radius: 16px 16px 16px 4px;
+            max-width: 85%;
+        }
+
+        .chat-message-content {
+            padding: 12px 16px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .chat-input-container {
+            padding: 16px 20px;
+            border-top: 1px solid #2a2a2a;
+            background: #1a1a1a;
+        }
+
+        .chat-input-wrapper {
+            background: #2a2a2a;
+            border-radius: 12px;
+            border: 1px solid #3a3a3a;
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+
+        .chat-input-wrapper:focus-within {
+            border-color: #667eea;
+        }
+
+        .chat-input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: #fff;
+            padding: 14px 16px;
+            font-size: 14px;
+            resize: none;
+            outline: none;
+            font-family: inherit;
+        }
+
+        .chat-input::placeholder {
+            color: #666;
+        }
+
+        .chat-input-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            border-top: 1px solid #3a3a3a;
+        }
+
+        .chat-input-hint {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .chat-send-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.2s;
+        }
+
+        .chat-send-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* RIGHT PANEL - Preview */
+        .preview-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #0f0f0f;
+            overflow: hidden;
+        }
+
+        .preview-header {
+            height: 50px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #2a2a2a;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+        }
+
+        .preview-url-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #2a2a2a;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #888;
+        }
+
+        .preview-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .preview-content {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .canvas-wrapper {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 30px rgba(0,0,0,0.3);
+            width: 100%;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .preview-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* ========== BUTTONS ========== */
         .btn {
             padding: 8px 16px;
             border-radius: 6px;
@@ -82,21 +235,22 @@
 
         .btn-ghost {
             background: transparent;
-            color: #666;
+            color: #888;
         }
 
         .btn-ghost:hover {
-            background: #f0f0f0;
+            background: #2a2a2a;
+            color: #fff;
         }
 
         .btn-outline {
-            background: white;
+            background: transparent;
             color: #667eea;
             border: 1px solid #667eea;
         }
 
         .btn-outline:hover {
-            background: #f8f9ff;
+            background: rgba(102, 126, 234, 0.1);
         }
 
         .btn-primary {
@@ -117,36 +271,21 @@
             align-items: center;
             justify-content: center;
             border-radius: 8px;
-            font-size: 18px;
-        }
-
-        /* ========== CANVAS AREA ========== */
-        .canvas-area {
-            flex: 1;
-            background: #e8e8e8;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 30px;
-            overflow: auto;
-            position: relative;
-        }
-
-        .canvas-wrapper {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            width: 100%;
-            max-width: 1200px;
-            height: calc(100% - 20px);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .preview-frame {
-            width: 100%;
-            height: 100%;
+            font-size: 16px;
+            background: #2a2a2a;
+            color: #888;
             border: none;
+            cursor: pointer;
+        }
+
+        .btn-icon:hover {
+            background: #3a3a3a;
+            color: #fff;
+        }
+
+        /* Hide old elements */
+        .main-content, .top-bar, .canvas-area, .ai-sidebar {
+            display: none !important;
         }
 
         /* ========== WELCOME SCREEN ========== */
@@ -1114,7 +1253,67 @@
     </style>
 </head>
 <body>
+    <!-- NEW LOVABLE-STYLE LAYOUT -->
     <div class="app-container">
+        <!-- LEFT PANEL - Chat -->
+        <div class="chat-panel">
+            <div class="chat-panel-header">
+                <span class="chat-panel-logo">AI Builder</span>
+                <span class="chat-panel-title">by Topmate</span>
+            </div>
+
+            <div class="chat-messages-container" id="chatMessagesNew">
+                <!-- Messages appear here -->
+            </div>
+
+            <div class="chat-input-container">
+                <div class="chat-input-wrapper">
+                    <textarea class="chat-input" id="chatInputNew" placeholder="Describe what you want to change..." rows="3" onkeydown="handleChatKeydownNew(event)"></textarea>
+                    <div class="chat-input-actions">
+                        <span class="chat-input-hint">Press Enter to send</span>
+                        <button class="chat-send-btn" onclick="sendChatMessageNew()">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT PANEL - Preview -->
+        <div class="preview-panel">
+            <div class="preview-header">
+                <div class="preview-url-bar">
+                    <span>🌐</span>
+                    <span id="previewUrl">your-website.topmate.io</span>
+                </div>
+                <div class="preview-actions">
+                    <button class="btn-icon" onclick="undoAction()" title="Undo">↶</button>
+                    <button class="btn-icon" onclick="polishAll()" title="Fix Layout">✨</button>
+                    <button class="btn btn-ghost" onclick="resetForm()">New</button>
+                    <button class="btn btn-outline" onclick="downloadHTML()">Download</button>
+                </div>
+            </div>
+
+            <div class="preview-content">
+                <div class="canvas-wrapper" id="newCanvasWrapper">
+                    <!-- Preview iframe will be here -->
+                    <div class="welcome-screen" id="welcomeScreenNew" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; background: #f5f5f5; padding: 40px;">
+                        <h1 style="font-size: 28px; color: #333; margin-bottom: 12px;">Create Your Website</h1>
+                        <p style="color: #666; margin-bottom: 30px;">Enter your Topmate username or describe what you want</p>
+
+                        <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+                            <input type="text" id="usernameNew" placeholder="Topmate username" style="padding: 12px 16px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; width: 250px;">
+                            <button class="btn btn-primary" onclick="generateWebsiteNew()" style="padding: 12px 24px;">Generate</button>
+                        </div>
+
+                        <div style="color: #999; font-size: 13px;">or upload your HTML file</div>
+                        <input type="file" id="htmlUploadNew" accept=".html,.htm" onchange="handleFileUploadNew(event)" style="margin-top: 12px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- OLD LAYOUT (hidden) -->
+    <div class="app-container" style="display: none;">
         <div class="main-content">
             <!-- Top Bar -->
             <div class="top-bar">
@@ -2950,6 +3149,205 @@ Do NOT change colors, fonts, or the overall design aesthetic. Only fix spacing a
                 cancelInlineEdit();
             }
         });
+
+        // ========== NEW LOVABLE-STYLE FUNCTIONS ==========
+
+        function handleChatKeydownNew(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendChatMessageNew();
+            }
+        }
+
+        function addChatMessageNew(role, content) {
+            const container = document.getElementById('chatMessagesNew');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${role}`;
+            messageDiv.innerHTML = `<div class="chat-message-content">${content}</div>`;
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+            return messageDiv;
+        }
+
+        async function sendChatMessageNew() {
+            const input = document.getElementById('chatInputNew');
+            const message = input.value.trim();
+            if (!message) return;
+
+            addChatMessageNew('user', message);
+            input.value = '';
+
+            // Show loading
+            const loadingMsg = addChatMessageNew('assistant', '⏳ Working on it...');
+
+            try {
+                if (currentHTML && currentHTML.length > 100) {
+                    // Edit existing website
+                    const response = await fetch(`${AI_BASE}/api/edit/optimized`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            html: currentHTML,
+                            edit_instruction: message,
+                            design_context: designContext,
+                            selected_element: selectedComponent ? {
+                                selector: selectedComponent.selector,
+                                tag: selectedComponent.tag,
+                                classes: selectedComponent.classes,
+                                text: selectedComponent.text,
+                                outer_html: selectedComponent.outer_html,
+                                color_classes: selectedComponent.color_classes
+                            } : null
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (data.success && data.html) {
+                        htmlHistory.push(currentHTML);
+                        currentHTML = data.html;
+                        updatePreviewFrameNew(currentHTML);
+                        loadingMsg.querySelector('.chat-message-content').textContent = `✅ ${data.summary || 'Done!'}`;
+                    } else {
+                        loadingMsg.querySelector('.chat-message-content').textContent = `❌ ${data.error || 'Failed'}`;
+                    }
+                } else {
+                    loadingMsg.querySelector('.chat-message-content').textContent = '💡 Generate a website first, then I can help you edit it!';
+                }
+            } catch (error) {
+                loadingMsg.querySelector('.chat-message-content').textContent = `❌ Error: ${error.message}`;
+            }
+        }
+
+        async function generateWebsiteNew() {
+            const username = document.getElementById('usernameNew').value.trim();
+            if (!username) {
+                addChatMessageNew('assistant', '⚠️ Please enter a Topmate username');
+                return;
+            }
+
+            // Hide welcome screen
+            document.getElementById('welcomeScreenNew').style.display = 'none';
+
+            addChatMessageNew('user', `Generate website for @${username}`);
+            const loadingMsg = addChatMessageNew('assistant', '🚀 Building your website...');
+
+            try {
+                const response = await fetch(`${AI_BASE}/api/build/website`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: username,
+                        template_id: 'modern-minimal'
+                    })
+                });
+
+                const data = await response.json();
+                if (data.html) {
+                    currentHTML = data.html;
+                    currentUsername = username;
+                    htmlHistory = [currentHTML];
+                    document.getElementById('previewUrl').textContent = `${username}.topmate.io`;
+                    updatePreviewFrameNew(currentHTML);
+                    extractDesignContext(currentHTML);
+                    loadingMsg.querySelector('.chat-message-content').textContent = '✅ Website created! Click on any element to select it, then tell me what to change.';
+                } else {
+                    loadingMsg.querySelector('.chat-message-content').textContent = `❌ ${data.error || 'Failed to generate'}`;
+                    document.getElementById('welcomeScreenNew').style.display = 'flex';
+                }
+            } catch (error) {
+                loadingMsg.querySelector('.chat-message-content').textContent = `❌ Error: ${error.message}`;
+                document.getElementById('welcomeScreenNew').style.display = 'flex';
+            }
+        }
+
+        function handleFileUploadNew(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentHTML = e.target.result;
+                htmlHistory = [currentHTML];
+                document.getElementById('welcomeScreenNew').style.display = 'none';
+                updatePreviewFrameNew(currentHTML);
+                extractDesignContext(currentHTML);
+                addChatMessageNew('assistant', '✅ HTML uploaded! Click on any element to select it, then tell me what to change.');
+            };
+            reader.readAsText(file);
+        }
+
+        function updatePreviewFrameNew(html) {
+            const container = document.getElementById('newCanvasWrapper');
+            if (!html) return;
+
+            // Remove welcome screen if still visible
+            const welcome = document.getElementById('welcomeScreenNew');
+            if (welcome) welcome.style.display = 'none';
+
+            // Remove old iframe
+            const oldFrame = container.querySelector('iframe');
+            if (oldFrame) oldFrame.remove();
+
+            // Create new iframe
+            const newFrame = document.createElement('iframe');
+            newFrame.id = 'previewFrameNew';
+            newFrame.className = 'preview-frame';
+            newFrame.style.cssText = 'width: 100%; height: 100%; border: none;';
+            container.appendChild(newFrame);
+
+            // Add edit mode styles and click handler
+            const editModeStyles = `
+                <style>
+                    .ai-edit-hover { outline: 2px dashed #667eea !important; cursor: pointer !important; }
+                    .ai-edit-selected { outline: 2px solid #667eea !important; background: rgba(102, 126, 234, 0.05) !important; }
+                </style>
+            `;
+
+            const modifiedHtml = html.replace('</head>', editModeStyles + '</head>');
+            newFrame.srcdoc = modifiedHtml;
+
+            newFrame.onload = function() {
+                const doc = newFrame.contentDocument;
+                if (!doc) return;
+
+                doc.body.addEventListener('mouseover', (e) => {
+                    if (e.target !== doc.body && e.target !== doc.documentElement) {
+                        e.target.classList.add('ai-edit-hover');
+                    }
+                });
+
+                doc.body.addEventListener('mouseout', (e) => {
+                    e.target.classList.remove('ai-edit-hover');
+                });
+
+                doc.body.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    // Remove old selection
+                    doc.querySelectorAll('.ai-edit-selected').forEach(el => el.classList.remove('ai-edit-selected'));
+
+                    // Select new element
+                    e.target.classList.add('ai-edit-selected');
+                    selectedElement = e.target;
+
+                    // Store component info
+                    selectedComponent = {
+                        element: e.target,
+                        selector: getSelector(e.target),
+                        tag: e.target.tagName.toLowerCase(),
+                        classes: Array.from(e.target.classList).filter(c => !c.startsWith('ai-')),
+                        text: e.target.textContent?.substring(0, 200),
+                        outer_html: e.target.outerHTML?.substring(0, 2000),
+                        color_classes: getColorClasses(e.target)
+                    };
+
+                    // Show selection in chat
+                    const selectedText = e.target.textContent?.substring(0, 50) || e.target.tagName;
+                    addChatMessageNew('assistant', `📍 Selected: "${selectedText}..." - Now tell me what to change!`);
+                });
+            };
+        }
     </script>
 </body>
 </html>
