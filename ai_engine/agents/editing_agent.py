@@ -371,6 +371,15 @@ Make your best judgment based on this visual context.
                     logger.warning(f"EditingAgent: Browserbase init failed, using local Playwright: {e}")
                     browserbase_page = None
 
+            # Log what we received
+            logger.info(f"EditingAgent: Instruction = '{instruction}'")
+            if selected_element:
+                logger.info(f"EditingAgent: Selected element selector = '{selected_element.get('selector', 'NONE')}'")
+                logger.info(f"EditingAgent: Selected element tag = '{selected_element.get('tag', 'NONE')}'")
+                logger.info(f"EditingAgent: Selected element classes = '{selected_element.get('classes', [])}'")
+            else:
+                logger.warning("EditingAgent: NO SELECTED ELEMENT - will edit globally!")
+
             # Build context-aware system prompt
             system_prompt = build_editing_system_prompt(
                 design_context=design_context,

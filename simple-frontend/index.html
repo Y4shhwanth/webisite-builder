@@ -1385,7 +1385,9 @@
 
     <script>
         // ========== CONFIGURATION ==========
-        const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+        // Force development mode by adding ?dev=true to URL or set this to true
+        const forceDevMode = new URLSearchParams(window.location.search).get('dev') === 'true';
+        const isProduction = !forceDevMode && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
 
         // Production URLs
         const PROD_API_BASE = 'http://localhost:8000/api';  // Django backend (not needed for now)
@@ -1397,6 +1399,14 @@
 
         const API_BASE = isProduction ? PROD_API_BASE : DEV_API_BASE;
         const AI_BASE = isProduction ? PROD_AI_BASE : DEV_AI_BASE;
+
+        // Log which backend is being used
+        console.log('=== BACKEND CONFIGURATION ===');
+        console.log('Hostname:', window.location.hostname);
+        console.log('Force dev mode:', forceDevMode);
+        console.log('Is production:', isProduction);
+        console.log('AI_BASE:', AI_BASE);
+        console.log('=============================');
 
         // ========== STATE ==========
         let currentHTML = '';
@@ -1885,41 +1895,66 @@
         }
 
         function getSelector(element) {
-            // Build a more specific selector for better targeting
+            // Build a unique selector for precise targeting
+            // Strategy: Include parent context to ensure uniqueness across the document
+
             if (element.id) return `#${element.id}`;
 
             const tag = element.tagName.toLowerCase();
             const classes = element.className ?
-                element.className.split(' ').filter(c => c && !c.startsWith('ai-')) : [];
+                element.className.split(' ').filter(c => c && !c.startsWith('ai-') && !c.includes(':')) : [];
 
-            // Try to build a unique selector
+            // Build the element's own selector
+            let elementSelector = tag;
             if (classes.length > 0) {
-                // Use multiple classes for specificity
-                const classSelector = classes.slice(0, 3).map(c => `.${c}`).join('');
-                let selector = `${tag}${classSelector}`;
-
-                // Add nth-child if there are siblings with same selector
-                if (element.parentElement) {
-                    const siblings = Array.from(element.parentElement.children);
-                    const sameTagSiblings = siblings.filter(s => s.tagName === element.tagName);
-                    if (sameTagSiblings.length > 1) {
-                        const index = sameTagSiblings.indexOf(element) + 1;
-                        selector += `:nth-of-type(${index})`;
-                    }
-                }
-                return selector;
+                elementSelector += classes.slice(0, 3).map(c => `.${c}`).join('');
             }
 
-            // Fallback to tag with nth-child
-            if (element.parentElement) {
-                const siblings = Array.from(element.parentElement.children);
+            // Get parent context for uniqueness
+            const parent = element.parentElement;
+            let parentSelector = '';
+
+            if (parent && parent.tagName !== 'BODY' && parent.tagName !== 'HTML') {
+                // Try parent's ID first
+                if (parent.id) {
+                    parentSelector = `#${parent.id}`;
+                } else {
+                    // Use parent's tag and first meaningful class
+                    const parentClasses = parent.className ?
+                        parent.className.split(' ').filter(c => c && !c.startsWith('ai-') && !c.includes(':')) : [];
+
+                    if (parentClasses.length > 0) {
+                        // Look for semantic class names (section, hero, about, services, etc.)
+                        const semanticClass = parentClasses.find(c =>
+                            /section|hero|about|service|contact|footer|header|nav|testimonial|pricing|feature/i.test(c)
+                        ) || parentClasses[0];
+                        parentSelector = `${parent.tagName.toLowerCase()}.${semanticClass}`;
+                    } else {
+                        parentSelector = parent.tagName.toLowerCase();
+                    }
+                }
+            }
+
+            // Add nth-of-type for elements with siblings of same tag
+            let nthSelector = '';
+            if (parent) {
+                const siblings = Array.from(parent.children);
                 const sameTagSiblings = siblings.filter(s => s.tagName === element.tagName);
                 if (sameTagSiblings.length > 1) {
                     const index = sameTagSiblings.indexOf(element) + 1;
-                    return `${tag}:nth-of-type(${index})`;
+                    nthSelector = `:nth-of-type(${index})`;
                 }
             }
-            return tag;
+
+            // Combine for full selector
+            const fullSelector = parentSelector
+                ? `${parentSelector} > ${elementSelector}${nthSelector}`
+                : `${elementSelector}${nthSelector}`;
+
+            // Log the generated selector for debugging
+            console.log('Generated selector:', fullSelector, 'for element:', element.outerHTML.substring(0, 100));
+
+            return fullSelector;
         }
 
         function getElementAttributes(element) {
