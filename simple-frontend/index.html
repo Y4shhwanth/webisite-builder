@@ -3417,12 +3417,15 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                     if (data.success && data.html) {
                         // Verify HTML actually changed
                         if (data.html !== currentHTML) {
+                            const beforeHTML = currentHTML;
                             htmlHistory.push(currentHTML);
                             currentHTML = data.html;
                             updatePreviewFrameNew(currentHTML);
                             // Design context extraction is optional - don't block on it
                             try { if (typeof extractDesignContext === 'function') extractDesignContext(currentHTML); } catch(e) { console.warn('Design context extraction skipped:', e); }
-                            loadingMsg.querySelector('.chat-message-content').textContent = `✅ ${data.summary || 'Done!'}`;
+
+                            // Show before/after comparison
+                            showBeforeAfterComparison(beforeHTML, currentHTML, data.summary || 'Edit applied', loadingMsg);
                         } else {
                             console.warn('Edit returned same HTML - no change detected');
                             loadingMsg.querySelector('.chat-message-content').textContent = '⚠️ No changes detected. Try being more specific about what to change.';
@@ -3522,6 +3525,49 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                 <style>
                     .ai-edit-hover { outline: 2px dashed #667eea !important; cursor: pointer !important; }
                     .ai-edit-selected { outline: 2px solid #667eea !important; background: rgba(102, 126, 234, 0.05) !important; }
+                    .ai-inline-edit-popup {
+                        position: fixed;
+                        background: #1a1a1a;
+                        border: 1px solid #333;
+                        border-radius: 8px;
+                        padding: 12px;
+                        box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+                        z-index: 99999;
+                        min-width: 300px;
+                        max-width: 500px;
+                    }
+                    .ai-inline-edit-popup textarea {
+                        width: 100%;
+                        min-height: 60px;
+                        background: #2a2a2a;
+                        border: 1px solid #444;
+                        border-radius: 6px;
+                        color: #fff;
+                        padding: 8px;
+                        font-size: 14px;
+                        resize: vertical;
+                    }
+                    .ai-inline-edit-popup .btn-row {
+                        display: flex;
+                        gap: 8px;
+                        margin-top: 8px;
+                        justify-content: flex-end;
+                    }
+                    .ai-inline-edit-popup button {
+                        padding: 6px 16px;
+                        border-radius: 6px;
+                        border: none;
+                        cursor: pointer;
+                        font-size: 13px;
+                    }
+                    .ai-inline-edit-popup .btn-save {
+                        background: #667eea;
+                        color: white;
+                    }
+                    .ai-inline-edit-popup .btn-cancel {
+                        background: #444;
+                        color: #ccc;
+                    }
                 </style>
             `;
 
@@ -3542,6 +3588,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                     e.target.classList.remove('ai-edit-hover');
                 });
 
+                // Single click - select element
                 doc.body.addEventListener('click', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -3564,11 +3611,246 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                         color_classes: getColorClasses(e.target)
                     };
 
-                    // Show selection in chat
-                    const selectedText = e.target.textContent?.substring(0, 50) || e.target.tagName;
-                    addChatMessageNew('assistant', `📍 Selected: "${selectedText}..." - Now tell me what to change!`);
+                    // Show selection in chat - special handling for images
+                    if (e.target.tagName.toLowerCase() === 'img') {
+                        showSelectedImageInChat(e.target);
+                    } else {
+                        const selectedText = e.target.textContent?.substring(0, 50) || e.target.tagName;
+                        addChatMessageNew('assistant', `📍 Selected: "${selectedText}..." - Now tell me what to change!`);
+                    }
+                });
+
+                // Double click - inline text editing
+                doc.body.addEventListener('dblclick', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    // Only for text elements
+                    const tag = e.target.tagName.toLowerCase();
+                    if (['img', 'video', 'iframe', 'svg', 'canvas'].includes(tag)) return;
+
+                    // Show inline edit popup
+                    showInlineEditPopup(e.target, doc, newFrame);
                 });
             };
+        }
+
+        // Show inline text edit popup
+        function showInlineEditPopup(element, doc, frame) {
+            // Remove any existing popup
+            const existing = doc.querySelector('.ai-inline-edit-popup');
+            if (existing) existing.remove();
+
+            // Get element position
+            const rect = element.getBoundingClientRect();
+            const frameRect = frame.getBoundingClientRect();
+
+            // Create popup in parent document (not iframe)
+            const popup = document.createElement('div');
+            popup.className = 'ai-inline-edit-popup';
+            popup.style.cssText = `
+                position: fixed;
+                top: ${frameRect.top + rect.top + rect.height + 10}px;
+                left: ${frameRect.left + rect.left}px;
+                background: #1a1a1a;
+                border: 1px solid #333;
+                border-radius: 8px;
+                padding: 12px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+                z-index: 99999;
+                min-width: 300px;
+                max-width: 500px;
+            `;
+
+            const currentText = element.textContent || '';
+            popup.innerHTML = `
+                <div style="font-size: 12px; color: #888; margin-bottom: 8px;">Edit text directly:</div>
+                <textarea style="width: 100%; min-height: 60px; background: #2a2a2a; border: 1px solid #444; border-radius: 6px; color: #fff; padding: 8px; font-size: 14px; resize: vertical;">${currentText}</textarea>
+                <div style="display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end;">
+                    <button class="btn-cancel" style="padding: 6px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; background: #444; color: #ccc;">Cancel</button>
+                    <button class="btn-save" style="padding: 6px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; background: #667eea; color: white;">Save</button>
+                </div>
+            `;
+
+            document.body.appendChild(popup);
+
+            const textarea = popup.querySelector('textarea');
+            textarea.focus();
+            textarea.select();
+
+            // Handle save
+            popup.querySelector('.btn-save').onclick = async () => {
+                const newText = textarea.value;
+                if (newText !== currentText) {
+                    await applyInlineTextEdit(element, currentText, newText);
+                }
+                popup.remove();
+            };
+
+            // Handle cancel
+            popup.querySelector('.btn-cancel').onclick = () => {
+                popup.remove();
+            };
+
+            // Handle Enter to save (Shift+Enter for new line)
+            textarea.onkeydown = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    popup.querySelector('.btn-save').click();
+                }
+                if (e.key === 'Escape') {
+                    popup.remove();
+                }
+            };
+
+            // Close on click outside
+            setTimeout(() => {
+                document.addEventListener('click', function closePopup(e) {
+                    if (!popup.contains(e.target)) {
+                        popup.remove();
+                        document.removeEventListener('click', closePopup);
+                    }
+                });
+            }, 100);
+        }
+
+        // Apply inline text edit
+        async function applyInlineTextEdit(element, oldText, newText) {
+            // Store before state
+            const beforeHTML = currentHTML;
+
+            // Show loading in chat
+            addChatMessageNew('user', `Change text: "${oldText.substring(0, 30)}..." → "${newText.substring(0, 30)}..."`);
+            const loadingMsg = addChatMessageNew('assistant', '⏳ Updating text...');
+
+            try {
+                const response = await fetch(`${AI_BASE}/api/edit/optimized`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        html: currentHTML,
+                        edit_instruction: `Change the text content from "${oldText}" to "${newText}"`,
+                        selected_element: {
+                            selector: getSelector(element),
+                            tag: element.tagName.toLowerCase(),
+                            text: oldText,
+                            outer_html: element.outerHTML?.substring(0, 2000)
+                        }
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success && data.html && data.html !== currentHTML) {
+                    htmlHistory.push(currentHTML);
+                    currentHTML = data.html;
+                    updatePreviewFrameNew(currentHTML);
+
+                    // Show before/after comparison
+                    showBeforeAfterComparison(beforeHTML, currentHTML, `Changed text to "${newText.substring(0, 30)}..."`, loadingMsg);
+                } else {
+                    loadingMsg.querySelector('.chat-message-content').innerHTML = '⚠️ Could not update text. Try using the chat instead.';
+                }
+            } catch (error) {
+                loadingMsg.querySelector('.chat-message-content').innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+
+        // Show selected image in chat
+        function showSelectedImageInChat(imgElement) {
+            const imgSrc = imgElement.src || imgElement.getAttribute('src');
+            const imgAlt = imgElement.alt || 'Selected image';
+
+            const messageHtml = `
+                <div style="margin-bottom: 8px;">📍 Selected image:</div>
+                <div style="background: #2a2a2a; border-radius: 8px; padding: 8px; margin-bottom: 8px;">
+                    <img src="${imgSrc}" alt="${imgAlt}" style="max-width: 200px; max-height: 150px; border-radius: 6px; display: block;">
+                </div>
+                <div style="font-size: 13px; color: #888;">Tell me to replace it with a new image URL, or describe changes.</div>
+            `;
+
+            addChatMessageNewHtml('assistant', messageHtml);
+        }
+
+        // Add chat message with HTML content
+        function addChatMessageNewHtml(role, htmlContent) {
+            const container = document.getElementById('chatMessagesNew');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${role}`;
+            messageDiv.innerHTML = `
+                <div class="chat-message-avatar">${role === 'user' ? '👤' : '🤖'}</div>
+                <div class="chat-message-content">${htmlContent}</div>
+            `;
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+            return messageDiv;
+        }
+
+        // Show before/after comparison in chat
+        function showBeforeAfterComparison(beforeHTML, afterHTML, summary, existingMsg) {
+            // Create thumbnail previews using data URLs
+            const beforeThumb = createHtmlThumbnail(beforeHTML);
+            const afterThumb = createHtmlThumbnail(afterHTML);
+
+            const comparisonHtml = `
+                <div style="margin-bottom: 8px;">✅ ${summary}</div>
+                <div style="display: flex; gap: 12px; margin-top: 12px;">
+                    <div class="version-card" data-version="before" style="flex: 1; cursor: pointer; border: 2px solid transparent; border-radius: 8px; padding: 8px; background: #2a2a2a; transition: all 0.2s;">
+                        <div style="font-size: 11px; color: #888; margin-bottom: 6px;">Before</div>
+                        <div style="background: #1a1a1a; border-radius: 6px; height: 80px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                            <iframe srcdoc="${escapeHtml(beforeHTML)}" style="width: 300%; height: 300%; transform: scale(0.33); transform-origin: top left; pointer-events: none; border: none;"></iframe>
+                        </div>
+                        <button class="revert-btn" style="margin-top: 8px; width: 100%; padding: 6px; background: #444; color: #ccc; border: none; border-radius: 4px; font-size: 12px; cursor: pointer;">Use this</button>
+                    </div>
+                    <div class="version-card selected" data-version="after" style="flex: 1; cursor: pointer; border: 2px solid #667eea; border-radius: 8px; padding: 8px; background: #2a2a2a; transition: all 0.2s;">
+                        <div style="font-size: 11px; color: #888; margin-bottom: 6px;">After (current)</div>
+                        <div style="background: #1a1a1a; border-radius: 6px; height: 80px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                            <iframe srcdoc="${escapeHtml(afterHTML)}" style="width: 300%; height: 300%; transform: scale(0.33); transform-origin: top left; pointer-events: none; border: none;"></iframe>
+                        </div>
+                        <button class="keep-btn" style="margin-top: 8px; width: 100%; padding: 6px; background: #667eea; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer;">Keep this</button>
+                    </div>
+                </div>
+            `;
+
+            if (existingMsg) {
+                existingMsg.querySelector('.chat-message-content').innerHTML = comparisonHtml;
+
+                // Add click handlers for version selection
+                const revertBtn = existingMsg.querySelector('.revert-btn');
+                const keepBtn = existingMsg.querySelector('.keep-btn');
+
+                if (revertBtn) {
+                    revertBtn.onclick = () => {
+                        // Revert to before version
+                        currentHTML = beforeHTML;
+                        htmlHistory.pop(); // Remove the after version from history
+                        updatePreviewFrameNew(currentHTML);
+                        existingMsg.querySelector('.chat-message-content').innerHTML = '↩️ Reverted to previous version';
+                        showToast('Reverted to previous version', 'success');
+                    };
+                }
+
+                if (keepBtn) {
+                    keepBtn.onclick = () => {
+                        existingMsg.querySelector('.chat-message-content').innerHTML = `✅ ${summary}`;
+                        showToast('Changes kept', 'success');
+                    };
+                }
+            }
+        }
+
+        // Escape HTML for safe embedding in srcdoc
+        function escapeHtml(html) {
+            return html
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        // Create HTML thumbnail (simplified)
+        function createHtmlThumbnail(html) {
+            return html.substring(0, 5000); // Truncate for performance
         }
     </script>
 </body>
