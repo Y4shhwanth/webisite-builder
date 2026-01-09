@@ -243,6 +243,44 @@ Always return valid, complete HTML."""
                     "required": ["summary"]
                 }
             }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "capture_screenshot",
+                "description": "Capture a screenshot of the current page state or a specific element. Use this to visually verify your changes or see the current state of the page. The screenshot will be shown to you.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "selector": {
+                            "type": "string",
+                            "description": "Optional CSS selector to capture just a specific element. Leave empty for full page."
+                        },
+                        "reason": {
+                            "type": "string",
+                            "description": "Why you're capturing this screenshot (e.g., 'verify color change', 'check layout')"
+                        }
+                    },
+                    "required": []
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_element_visual_info",
+                "description": "Get visual information about the selected element including its current colors, computed styles, and position on the page. Useful for understanding what color to change from.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "selector": {
+                            "type": "string",
+                            "description": "CSS selector for the element. If empty, uses the currently selected element."
+                        }
+                    },
+                    "required": []
+                }
+            }
         }
     ]
 
@@ -484,7 +522,8 @@ Make your best judgment based on this visual context.
                         logger.info(f"EditingAgent: finalize_edit called - summary: {edit_summary}")
                         logger.info(f"EditingAgent: Using self.current_html with length: {len(final_html)}")
 
-                        # Capture final screenshot if Browserbase is active
+                        # Capture final screenshot and verify if Browserbase is active
+                        verification_result = None
                         if browserbase_page:
                             try:
                                 # Update the browser with final HTML
@@ -493,31 +532,61 @@ Make your best judgment based on this visual context.
                                 if final_screenshot:
                                     self.screenshots.append(final_screenshot)
 
-                                # Optionally verify the edit visually
+                                # Verify the edit visually
                                 if len(self.screenshots) >= 2 and self.visual_verifier.is_available:
-                                    verification = await self.visual_verifier.verify_edit(
+                                    verification_result = await self.visual_verifier.verify_edit(
                                         before_screenshot=self.screenshots[0],
                                         after_screenshot=self.screenshots[-1],
-                                        expected_change=instruction
+                                        expected_change=instruction,
+                                        element_selector=selected_element.get("selector") if selected_element else None
                                     )
-                                    logger.info(f"EditingAgent: Visual verification - verified={verification.get('verified')}, confidence={verification.get('confidence')}")
+                                    logger.info(f"EditingAgent: Visual verification - verified={verification_result.get('verified')}, confidence={verification_result.get('confidence')}")
+
+                                    # Log suggestions if verification failed
+                                    if not verification_result.get('verified') and verification_result.get('suggestions'):
+                                        logger.warning(f"EditingAgent: Verification suggestions: {verification_result.get('suggestions')}")
+
                             except Exception as e:
                                 logger.warning(f"EditingAgent: Screenshot/verification error: {e}")
                             finally:
                                 # Clean up Browserbase session
                                 await self.browserbase.close()
 
-                        return {
+                        # Build response with verification data
+                        response = {
                             "success": True,
                             "html": final_html,
                             "summary": edit_summary,
                             "iterations": iteration,
-                            "replay_url": self.session_replay_url
+                            "replay_url": self.session_replay_url,
+                            "screenshots_captured": len(self.screenshots)
                         }
+
+                        # Add verification data if available
+                        if verification_result:
+                            response["verification"] = {
+                                "verified": verification_result.get("verified", False),
+                                "confidence": verification_result.get("confidence", 0),
+                                "explanation": verification_result.get("explanation", ""),
+                                "suggestions": verification_result.get("suggestions", [])
+                            }
+
+                        return response
 
                     # Update current HTML if edit was successful
                     if tool_result.get("success") and tool_result.get("html"):
                         self.current_html = tool_result["html"]
+
+                        # Capture screenshot after successful edit for visual feedback
+                        if browserbase_page and tool_name in ["modify_class", "edit_text", "edit_style", "edit_attribute", "find_and_replace"]:
+                            try:
+                                await self.browserbase.load_html(self.current_html)
+                                post_edit_screenshot = await self.browserbase.screenshot()
+                                if post_edit_screenshot:
+                                    self.screenshots.append(post_edit_screenshot)
+                                    logger.info(f"EditingAgent: Captured post-edit screenshot ({len(self.screenshots)} total)")
+                            except Exception as e:
+                                logger.warning(f"EditingAgent: Post-edit screenshot failed: {e}")
 
                     tool_results.append({
                         "tool_call_id": tool_id,
@@ -724,6 +793,118 @@ Make your best judgment based on this visual context.
             elif tool_name == "finalize_edit":
                 # This is handled in the main loop
                 return {"success": True, "message": "Finalized"}
+
+            elif tool_name == "capture_screenshot":
+                # Capture a screenshot for visual verification
+                selector = tool_input.get("selector", "")
+                reason = tool_input.get("reason", "visual check")
+
+                # Auto-inject selector from selected_element if not provided
+                if not selector and self.selected_element:
+                    selector = self.selected_element.get("selector", "")
+
+                if self.use_browserbase and self.browserbase._page:
+                    try:
+                        # Update browser with current HTML state
+                        await self.browserbase.load_html(self.current_html)
+
+                        # Capture screenshot (element-specific if selector provided)
+                        screenshot = await self.browserbase.screenshot(selector=selector if selector else None)
+                        if screenshot:
+                            self.screenshots.append(screenshot)
+                            logger.info(f"EditingAgent: capture_screenshot SUCCESS - reason: {reason}, selector: {selector or 'full page'}")
+                            return {
+                                "success": True,
+                                "message": f"Screenshot captured for: {reason}",
+                                "screenshot_index": len(self.screenshots) - 1,
+                                "has_visual": True
+                            }
+                        else:
+                            return {"success": False, "error": "Failed to capture screenshot"}
+                    except Exception as e:
+                        logger.warning(f"EditingAgent: capture_screenshot failed: {e}")
+                        return {"success": False, "error": str(e)}
+                else:
+                    return {"success": False, "error": "Browserbase not available for screenshots"}
+
+            elif tool_name == "get_element_visual_info":
+                # Get computed styles and visual info about an element
+                selector = tool_input.get("selector", "")
+
+                # Auto-inject selector from selected_element if not provided
+                if not selector and self.selected_element:
+                    selector = self.selected_element.get("selector", "")
+
+                if not selector:
+                    return {"success": False, "error": "No selector provided and no element selected"}
+
+                if self.use_browserbase and self.browserbase._page:
+                    try:
+                        # Update browser with current HTML state
+                        await self.browserbase.load_html(self.current_html)
+
+                        # Get computed styles and visual info
+                        visual_info = await self.browserbase._page.evaluate('''
+                            (selector) => {
+                                const el = document.querySelector(selector);
+                                if (!el) return null;
+
+                                const computed = window.getComputedStyle(el);
+                                const rect = el.getBoundingClientRect();
+
+                                return {
+                                    tag: el.tagName.toLowerCase(),
+                                    classes: Array.from(el.classList),
+                                    text: el.textContent?.substring(0, 100),
+                                    colors: {
+                                        backgroundColor: computed.backgroundColor,
+                                        color: computed.color,
+                                        borderColor: computed.borderColor
+                                    },
+                                    styles: {
+                                        fontSize: computed.fontSize,
+                                        fontWeight: computed.fontWeight,
+                                        fontFamily: computed.fontFamily,
+                                        padding: computed.padding,
+                                        margin: computed.margin,
+                                        borderRadius: computed.borderRadius
+                                    },
+                                    position: {
+                                        x: rect.x,
+                                        y: rect.y,
+                                        width: rect.width,
+                                        height: rect.height
+                                    }
+                                };
+                            }
+                        ''', selector)
+
+                        if visual_info:
+                            logger.info(f"EditingAgent: get_element_visual_info SUCCESS - {selector}")
+                            return {
+                                "success": True,
+                                "element": visual_info,
+                                "message": f"Visual info for element: {selector}"
+                            }
+                        else:
+                            return {"success": False, "error": f"Element not found: {selector}"}
+                    except Exception as e:
+                        logger.warning(f"EditingAgent: get_element_visual_info failed: {e}")
+                        return {"success": False, "error": str(e)}
+                else:
+                    # Fallback: return info from selected_element if available
+                    if self.selected_element:
+                        return {
+                            "success": True,
+                            "element": {
+                                "tag": self.selected_element.get("tag"),
+                                "classes": self.selected_element.get("classes", []),
+                                "color_classes": self.selected_element.get("color_classes", []),
+                                "text": self.selected_element.get("text", "")[:100]
+                            },
+                            "message": "Visual info from selected element (Browserbase not available)"
+                        }
+                    return {"success": False, "error": "Browserbase not available and no selected element"}
 
             else:
                 return {"success": False, "error": f"Unknown tool: {tool_name}"}
