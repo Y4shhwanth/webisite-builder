@@ -691,84 +691,128 @@ Make your best judgment based on this visual context.
                     selector = self.selected_element.get("selector", "")
                     logger.info(f"EditingAgent: modify_class - AUTO-INJECTING selector from selected_element: '{selector}'")
 
+                # Get outer_html for precise targeting (most reliable method)
+                outer_html = self.selected_element.get("outer_html", "") if self.selected_element else ""
+
                 logger.info(f"EditingAgent: modify_class - selector='{selector}', '{old_class}' -> '{new_class}'")
+                logger.info(f"EditingAgent: modify_class - outer_html available: {bool(outer_html)}, length: {len(outer_html) if outer_html else 0}")
 
                 if not old_class or not new_class:
                     return {"success": False, "error": "Missing old_class or new_class"}
 
-                # If selector provided, use targeted replacement
+                # STRATEGY: Try methods in order of precision
+                # 1. outer_html replacement (MOST PRECISE - guaranteed to target exact element)
+                # 2. BeautifulSoup selector (good but may match wrong element)
+                # 3. Global replacement (LAST RESORT - affects all occurrences)
+
+                # METHOD 1: outer_html replacement (MOST RELIABLE)
+                if outer_html and old_class in outer_html:
+                    logger.info(f"EditingAgent: modify_class - trying outer_html method (MOST PRECISE)")
+                    new_outer_html = outer_html.replace(old_class, new_class)
+
+                    # Check if outer_html exists in current HTML (exact match)
+                    if outer_html in self.current_html:
+                        modified_html = self.current_html.replace(outer_html, new_outer_html, 1)  # Replace only FIRST occurrence
+                        if modified_html != self.current_html:
+                            self.current_html = modified_html
+                            logger.info(f"EditingAgent: modify_class SUCCESS (outer_html - PRECISE)")
+                            return {
+                                "success": True,
+                                "html": modified_html,
+                                "message": f"Changed class '{old_class}' to '{new_class}' on EXACT selected element"
+                            }
+                    else:
+                        logger.warning(f"EditingAgent: outer_html exact match not found, trying fingerprint method")
+
+                # METHOD 1B: Text content fingerprint targeting
+                # Use the element's text content to find the specific element
+                if self.selected_element:
+                    text_content = self.selected_element.get("text", "")
+                    tag = self.selected_element.get("tag", "")
+
+                    if text_content and len(text_content) > 5 and old_class in self.current_html:
+                        import re
+                        # Create a pattern to find the element containing this text with the old_class
+                        # Escape special regex characters in text
+                        escaped_text = re.escape(text_content[:50].strip())
+
+                        # Pattern: find tag with old_class that contains our text
+                        # This pattern finds: <tag ... class="...old_class..." ...>...text...</tag>
+                        pattern = rf'(<{tag}[^>]*class="[^"]*){old_class}([^"]*"[^>]*>(?:[^<]*{escaped_text}|{escaped_text}[^<]*))'
+
+                        match = re.search(pattern, self.current_html, re.IGNORECASE | re.DOTALL)
+                        if match:
+                            logger.info(f"EditingAgent: modify_class - found element via text fingerprint")
+                            # Replace only in this specific match
+                            start, end = match.span()
+                            matched_text = match.group(0)
+                            new_matched_text = matched_text.replace(old_class, new_class, 1)
+                            modified_html = self.current_html[:start] + new_matched_text + self.current_html[end:]
+
+                            if modified_html != self.current_html:
+                                self.current_html = modified_html
+                                logger.info(f"EditingAgent: modify_class SUCCESS (text fingerprint)")
+                                return {
+                                    "success": True,
+                                    "html": modified_html,
+                                    "message": f"Changed class '{old_class}' to '{new_class}' on element containing '{text_content[:30]}...'"
+                                }
+
+                        logger.warning(f"EditingAgent: fingerprint pattern didn't match, trying selector")
+
+                # METHOD 2: BeautifulSoup selector
                 if selector:
                     try:
                         soup = BeautifulSoup(self.current_html, 'html.parser')
-                        # Try to find element with selector
                         element = soup.select_one(selector)
 
                         if element:
-                            # Get current classes
+                            logger.info(f"EditingAgent: modify_class - found element with selector '{selector}'")
                             current_classes = element.get('class', [])
                             if isinstance(current_classes, str):
                                 current_classes = current_classes.split()
 
-                            # Replace old_class with new_class
                             if old_class in current_classes:
                                 new_classes = [new_class if c == old_class else c for c in current_classes]
                                 element['class'] = new_classes
                                 modified_html = str(soup)
                                 self.current_html = modified_html
-                                logger.info(f"EditingAgent: modify_class SUCCESS (targeted)")
+                                logger.info(f"EditingAgent: modify_class SUCCESS (BeautifulSoup selector)")
                                 return {
                                     "success": True,
                                     "html": modified_html,
                                     "message": f"Changed class '{old_class}' to '{new_class}' on element '{selector}'"
                                 }
                             else:
-                                # Try to add the new class anyway (class might be from parent)
+                                # Class not on element, try adding new class
                                 current_classes.append(new_class)
                                 element['class'] = current_classes
                                 modified_html = str(soup)
                                 self.current_html = modified_html
-                                logger.info(f"EditingAgent: modify_class - added {new_class} (old class not found)")
+                                logger.info(f"EditingAgent: modify_class - added {new_class} (old class not on element)")
                                 return {
                                     "success": True,
                                     "html": modified_html,
                                     "message": f"Added class '{new_class}' to element '{selector}' ('{old_class}' was not on this element)"
                                 }
                         else:
-                            logger.warning(f"EditingAgent: selector '{selector}' not found, falling back to global replace")
+                            logger.warning(f"EditingAgent: selector '{selector}' not found in DOM")
                     except Exception as e:
-                        logger.warning(f"EditingAgent: BeautifulSoup selector failed: {e}, falling back to global replace")
+                        logger.warning(f"EditingAgent: BeautifulSoup selector failed: {e}")
 
-                # Fallback: global replacement (only if no selector or selector failed)
+                # METHOD 3: Global replacement (LAST RESORT - WARN USER)
                 if old_class in self.current_html:
-                    # Try to do a more targeted replacement using the element's outer HTML
-                    outer_html = tool_input.get("outer_html", "")
-                    # Also try from selected_element if available
-                    if not outer_html and self.selected_element:
-                        outer_html = self.selected_element.get("outer_html", "")
-                    if outer_html and old_class in outer_html:
-                        new_outer_html = outer_html.replace(old_class, new_class)
-                        modified_html = self.current_html.replace(outer_html, new_outer_html)
-                        if modified_html != self.current_html:
-                            self.current_html = modified_html
-                            logger.info(f"EditingAgent: modify_class SUCCESS (outer_html targeted)")
-                            return {
-                                "success": True,
-                                "html": modified_html,
-                                "message": f"Replaced class '{old_class}' with '{new_class}' (targeted via outer_html)"
-                            }
-
-                    # Last resort: global replacement (will affect all elements with this class)
+                    logger.warning(f"EditingAgent: modify_class - using GLOBAL replacement (all methods failed)")
                     modified_html = self.current_html.replace(old_class, new_class)
                     self.current_html = modified_html
-                    logger.warning(f"EditingAgent: modify_class SUCCESS but GLOBAL (no selector provided)")
                     return {
                         "success": True,
                         "html": modified_html,
-                        "message": f"WARNING: Replaced ALL '{old_class}' with '{new_class}' globally. Use selector for targeted changes."
+                        "message": f"WARNING: Changed ALL '{old_class}' to '{new_class}' globally (targeted methods failed)"
                     }
-                else:
-                    logger.info(f"EditingAgent: modify_class FAILED - class not found")
-                    return {"success": False, "error": f"Class '{old_class}' not found in HTML"}
+
+                logger.info(f"EditingAgent: modify_class FAILED - class '{old_class}' not found anywhere")
+                return {"success": False, "error": f"Class '{old_class}' not found in HTML"}
 
             elif tool_name == "find_and_replace":
                 # Direct string replacement
