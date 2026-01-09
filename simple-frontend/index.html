@@ -1258,71 +1258,26 @@
 
         <!-- AI Sidebar -->
         <div class="ai-sidebar" id="aiSidebar">
-            <div class="sidebar-header">
-                <h3>AI Assistant</h3>
+            <div class="sidebar-header" style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb;">
+                <h3 style="margin: 0; font-size: 14px; color: #6b7280;">AI Editor</h3>
                 <button class="sidebar-close" onclick="toggleAISidebar()">&times;</button>
             </div>
 
-            <!-- Context Panel (shows selected element) -->
-            <div class="context-panel" id="contextPanel">
-                <div class="context-label">Selected Element</div>
-                <div class="context-element" id="contextElement">Hero Section</div>
-                <div class="context-text" id="contextText">Welcome to my portfolio...</div>
-
-                <!-- Direct Text Edit -->
-                <div class="direct-edit-section">
-                    <div class="direct-edit-label">Edit Text</div>
-                    <div class="direct-edit-wrapper">
-                        <textarea class="direct-edit-input" id="directEditInput" placeholder="Type new text to replace..." rows="2"></textarea>
-                        <button class="direct-edit-btn" onclick="applyDirectTextEdit()">Replace</button>
-                    </div>
-                </div>
+            <!-- Hidden context panel (needed for functionality) -->
+            <div class="context-panel" id="contextPanel" style="display: none;">
+                <div class="context-element" id="contextElement"></div>
+                <div class="context-text" id="contextText"></div>
             </div>
 
-            <!-- Quick Actions -->
-            <div class="quick-actions">
-                <div class="quick-actions-title">Quick Actions</div>
-                <div class="quick-actions-grid">
-                    <button class="quick-action-btn" onclick="quickAction('expand')">
-                        <span class="icon">+</span> Expand
-                    </button>
-                    <button class="quick-action-btn" onclick="quickAction('condense')">
-                        <span class="icon">-</span> Condense
-                    </button>
-                    <button class="quick-action-btn" onclick="quickAction('engaging')">
-                        <span class="icon">*</span> Make Engaging
-                    </button>
-                    <button class="quick-action-btn" onclick="quickAction('fix')">
-                        <span class="icon">~</span> Fix Grammar
-                    </button>
-                    <button class="quick-action-btn" onclick="quickAction('rephrase')">
-                        <span class="icon">R</span> Rephrase
-                    </button>
-                    <button class="quick-action-btn" onclick="quickAction('polish')">
-                        <span class="icon">P</span> Polish All
-                    </button>
-                </div>
-            </div>
-
-            <!-- Chat Area -->
-            <div class="chat-area">
-                <div class="chat-messages" id="chatMessages">
-                    <div class="chat-message assistant">
-                        <div class="chat-message-content">
-                            Hi! I'm your AI assistant. Select any element on your website and I can help you edit it, or just tell me what changes you'd like to make.
-                        </div>
-                    </div>
+            <!-- Clean Chat Area -->
+            <div class="chat-area" style="display: flex; flex-direction: column; height: calc(100% - 50px);">
+                <div class="chat-messages" id="chatMessages" style="flex: 1; overflow-y: auto; padding: 16px;">
+                    <!-- Messages will appear here -->
                 </div>
 
-                <div class="chat-suggestions" id="chatSuggestions">
-                    <button class="suggestion-chip" onclick="useSuggestion('Change the color scheme')">Change colors</button>
-                    <button class="suggestion-chip" onclick="useSuggestion('Make text more engaging')">Improve text</button>
-                    <button class="suggestion-chip" onclick="useSuggestion('Add a new section')">Add section</button>
-                </div>
-
-                <div class="chat-input-area">
-                    <textarea class="chat-input" id="chatInput" placeholder="Ask me to make changes..." rows="1" onkeydown="handleChatKeydown(event)"></textarea>
-                    <button class="chat-send-btn" onclick="sendChatMessage()">Send</button>
+                <div class="chat-input-area" style="padding: 16px; border-top: 1px solid #e5e7eb; background: #fff;">
+                    <textarea class="chat-input" id="chatInput" placeholder="Describe changes... (e.g., 'make it darker', 'change text to...')" rows="2" onkeydown="handleChatKeydown(event)" style="width: 100%; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; font-size: 14px; resize: none; margin-bottom: 8px;"></textarea>
+                    <button class="chat-send-btn" onclick="sendChatMessage()" style="width: 100%; padding: 10px; background: #2563eb; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;">Send</button>
                 </div>
             </div>
         </div>
@@ -2537,7 +2492,7 @@
         }
 
         async function polishAll() {
-            showToast('Polishing entire website...', '');
+            showToast('Restructuring layout and spacing...', '');
 
             try {
                 const response = await fetch(`${AI_BASE}/api/edit/optimized`, {
@@ -2545,8 +2500,16 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         html: currentHTML,
-                        edit_instruction: 'Polish and improve the overall design: improve typography, spacing, colors, and visual hierarchy while maintaining the current structure',
-                        design_context: designContext  // Include design context for consistency
+                        edit_instruction: `Restructure and fix the website layout after content changes:
+1. Fix any text that overlaps or breaks out of its container
+2. Adjust spacing (padding, margins) so all content fits properly
+3. Ensure consistent gaps between sections and elements
+4. Fix any elements that look cramped or have too much empty space
+5. Maintain responsive design - ensure it still works on mobile
+6. Keep the same visual style and colors, just fix the structure
+
+Do NOT change colors, fonts, or the overall design aesthetic. Only fix spacing and layout issues.`,
+                        design_context: designContext
                     })
                 });
 
@@ -2557,7 +2520,7 @@
                     currentHTML = data.html;
                     updatePreviewFrame(currentHTML);
                     await syncHTML();
-                    showToast('Website polished!', 'success');
+                    showToast('Layout restructured!', 'success');
                 }
             } catch (error) {
                 showToast(`Error: ${error.message}`, 'error');
