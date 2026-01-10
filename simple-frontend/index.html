@@ -1622,6 +1622,7 @@
         let editModeEnabled = false;
         let selectedElement = null;
         let selectedComponent = null;
+        let lastSelectionMessage = null; // Track selection message to avoid chat clutter
         let components = [];
         let htmlHistory = [];
         let designContext = null;  // Store design context (fonts, colors, sections)
@@ -3615,11 +3616,16 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                     };
 
                     // Show selection in chat - special handling for images
+                    // Remove previous selection message to avoid chat clutter
+                    if (lastSelectionMessage && lastSelectionMessage.parentNode) {
+                        lastSelectionMessage.remove();
+                    }
+
                     if (e.target.tagName.toLowerCase() === 'img') {
-                        showSelectedImageInChat(e.target);
+                        lastSelectionMessage = showSelectedImageInChat(e.target);
                     } else {
                         const selectedText = e.target.textContent?.substring(0, 50) || e.target.tagName;
-                        addChatMessageNew('assistant', `📍 Selected: "${selectedText}..." - Now tell me what to change!`);
+                        lastSelectionMessage = addChatMessageNew('assistant', `📍 Selected: "${selectedText}${selectedText.length >= 50 ? '...' : ''}" - Now tell me what to change!`);
                     }
                 });
 
@@ -3868,13 +3874,15 @@ Use find_and_replace or modify_class to make these structural fixes.`,
 
             // Build instruction
             let instruction = '';
+            const targetText = newText !== oldText ? newText : oldText;
+
             if (oldText !== newText) {
-                instruction = `Replace ONLY the text "${oldText}" with "${newText}". `;
+                instruction = `Replace ONLY the exact text "${oldText}" with "${newText}". `;
             }
             if (colorValue) {
-                instruction += `Change the color of the text "${newText}" to ${colorValue}. `;
+                instruction += `IMPORTANT: Change the color of ONLY the specific text "${targetText}" to ${colorValue} by wrapping it in a <span style="color: ${colorValue};">. Do NOT change the color of the entire paragraph or container - ONLY wrap the specific selected text "${targetText}" in a span with the color style. `;
             }
-            instruction += `IMPORTANT: If the new text is longer or shorter than the original, you MUST adjust the layout, spacing, padding, font-size, or container width/height as needed to ensure the text fits perfectly without overflow or awkward spacing. The final result should look professionally designed with proper visual balance.`;
+            instruction += `If the new text is longer or shorter than the original, adjust the layout, spacing, padding, font-size, or container as needed to ensure proper fit. The final result should look professionally designed.`;
 
             try {
                 const response = await fetch(`${AI_BASE}/api/edit/optimized`, {
@@ -3969,7 +3977,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                 <div style="font-size: 13px; color: #888;">Tell me to replace it with a new image URL, or describe changes.</div>
             `;
 
-            addChatMessageNewHtml('assistant', messageHtml);
+            return addChatMessageNewHtml('assistant', messageHtml);
         }
 
         // Add chat message with HTML content
