@@ -3787,32 +3787,50 @@ Use find_and_replace or modify_class to make these structural fixes.`,
 
         // Show before/after comparison in chat
         function showBeforeAfterComparison(beforeHTML, afterHTML, summary, existingMsg) {
-            // Create thumbnail previews using data URLs
-            const beforeThumb = createHtmlThumbnail(beforeHTML);
-            const afterThumb = createHtmlThumbnail(afterHTML);
+            // Store HTML in data attributes and use unique IDs for iframes
+            const beforeId = 'before-iframe-' + Date.now();
+            const afterId = 'after-iframe-' + Date.now();
 
             const comparisonHtml = `
                 <div style="margin-bottom: 8px;">✅ ${summary}</div>
                 <div style="display: flex; gap: 12px; margin-top: 12px;">
                     <div class="version-card" data-version="before" style="flex: 1; cursor: pointer; border: 2px solid transparent; border-radius: 8px; padding: 8px; background: #2a2a2a; transition: all 0.2s;">
                         <div style="font-size: 11px; color: #888; margin-bottom: 6px;">Before</div>
-                        <div style="background: #1a1a1a; border-radius: 6px; height: 80px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
-                            <iframe srcdoc="${escapeHtml(beforeHTML)}" style="width: 300%; height: 300%; transform: scale(0.33); transform-origin: top left; pointer-events: none; border: none;"></iframe>
+                        <div style="background: #fff; border-radius: 6px; height: 120px; overflow: hidden; position: relative;">
+                            <iframe id="${beforeId}" style="width: 1200px; height: 800px; transform: scale(0.15); transform-origin: top left; pointer-events: none; border: none; background: #fff;"></iframe>
                         </div>
                         <button class="revert-btn" style="margin-top: 8px; width: 100%; padding: 6px; background: #444; color: #ccc; border: none; border-radius: 4px; font-size: 12px; cursor: pointer;">Use this</button>
                     </div>
                     <div class="version-card selected" data-version="after" style="flex: 1; cursor: pointer; border: 2px solid #667eea; border-radius: 8px; padding: 8px; background: #2a2a2a; transition: all 0.2s;">
                         <div style="font-size: 11px; color: #888; margin-bottom: 6px;">After (current)</div>
-                        <div style="background: #1a1a1a; border-radius: 6px; height: 80px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
-                            <iframe srcdoc="${escapeHtml(afterHTML)}" style="width: 300%; height: 300%; transform: scale(0.33); transform-origin: top left; pointer-events: none; border: none;"></iframe>
+                        <div style="background: #fff; border-radius: 6px; height: 120px; overflow: hidden; position: relative;">
+                            <iframe id="${afterId}" style="width: 1200px; height: 800px; transform: scale(0.15); transform-origin: top left; pointer-events: none; border: none; background: #fff;"></iframe>
                         </div>
                         <button class="keep-btn" style="margin-top: 8px; width: 100%; padding: 6px; background: #667eea; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer;">Keep this</button>
                     </div>
                 </div>
             `;
 
+            // Store HTML for later use
+            window._beforeAfterData = window._beforeAfterData || {};
+            window._beforeAfterData[beforeId] = beforeHTML;
+            window._beforeAfterData[afterId] = afterHTML;
+
             if (existingMsg) {
                 existingMsg.querySelector('.chat-message-content').innerHTML = comparisonHtml;
+
+                // Load HTML into iframes after they're in the DOM
+                setTimeout(() => {
+                    const beforeIframe = document.getElementById(beforeId);
+                    const afterIframe = document.getElementById(afterId);
+
+                    if (beforeIframe) {
+                        beforeIframe.srcdoc = beforeHTML;
+                    }
+                    if (afterIframe) {
+                        afterIframe.srcdoc = afterHTML;
+                    }
+                }, 50);
 
                 // Add click handlers for version selection
                 const revertBtn = existingMsg.querySelector('.revert-btn');
@@ -3838,20 +3856,6 @@ Use find_and_replace or modify_class to make these structural fixes.`,
             }
         }
 
-        // Escape HTML for safe embedding in srcdoc
-        function escapeHtml(html) {
-            return html
-                .replace(/&/g, '&amp;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;');
-        }
-
-        // Create HTML thumbnail (simplified)
-        function createHtmlThumbnail(html) {
-            return html.substring(0, 5000); // Truncate for performance
-        }
     </script>
 </body>
 </html>
