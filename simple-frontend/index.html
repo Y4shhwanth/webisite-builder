@@ -3787,56 +3787,100 @@ Use find_and_replace or modify_class to make these structural fixes.`,
 
         // Show before/after comparison in chat
         function showBeforeAfterComparison(beforeHTML, afterHTML, summary, existingMsg) {
-            const beforeId = 'before-iframe-' + Date.now();
-            const afterId = 'after-iframe-' + Date.now();
+            const timestamp = Date.now();
+            const beforeId = 'before-iframe-' + timestamp;
+            const afterId = 'after-iframe-' + timestamp;
+
+            // Track which version is currently being previewed
+            let previewingBefore = false;
 
             const comparisonHtml = `
                 <div style="margin-bottom: 10px; font-size: 13px;">✅ ${summary}</div>
                 <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-                    <div class="preview-card" data-version="before" style="flex: 1; min-width: 0;">
+                    <div class="preview-card before-card" style="flex: 1; min-width: 0; cursor: pointer; padding: 6px; border-radius: 8px; border: 2px solid transparent; transition: all 0.2s;">
                         <div style="font-size: 10px; color: #999; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">Before</div>
-                        <div style="border-radius: 6px; overflow: hidden; background: #fff; height: 70px; position: relative;">
-                            <iframe id="${beforeId}" sandbox="allow-same-origin" style="position: absolute; top: 0; left: 0; width: 800px; height: 600px; transform: scale(0.117); transform-origin: top left; pointer-events: none; border: none;"></iframe>
+                        <div class="preview-container" style="border-radius: 6px; overflow: hidden; background: #fff; height: 80px; position: relative;">
+                            <iframe id="${beforeId}" style="position: absolute; top: 0; left: 0; width: 1000px; height: 700px; transform: scale(0.09); transform-origin: top left; pointer-events: none; border: none; background: #fff;"></iframe>
                         </div>
+                        <div style="font-size: 10px; color: #888; margin-top: 4px; text-align: center;">Click to preview</div>
                     </div>
-                    <div style="display: flex; align-items: center; color: #666; font-size: 16px;">→</div>
-                    <div class="preview-card" data-version="after" style="flex: 1; min-width: 0;">
-                        <div style="font-size: 10px; color: #999; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">After</div>
-                        <div style="border-radius: 6px; overflow: hidden; background: #fff; height: 70px; position: relative; box-shadow: 0 0 0 2px #667eea;">
-                            <iframe id="${afterId}" sandbox="allow-same-origin" style="position: absolute; top: 0; left: 0; width: 800px; height: 600px; transform: scale(0.117); transform-origin: top left; pointer-events: none; border: none;"></iframe>
+                    <div style="display: flex; align-items: center; color: #666; font-size: 18px; padding: 0 4px;">→</div>
+                    <div class="preview-card after-card selected-card" style="flex: 1; min-width: 0; cursor: pointer; padding: 6px; border-radius: 8px; border: 2px solid #667eea; transition: all 0.2s;">
+                        <div style="font-size: 10px; color: #999; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">After <span style="color: #667eea;">(current)</span></div>
+                        <div class="preview-container" style="border-radius: 6px; overflow: hidden; background: #fff; height: 80px; position: relative;">
+                            <iframe id="${afterId}" style="position: absolute; top: 0; left: 0; width: 1000px; height: 700px; transform: scale(0.09); transform-origin: top left; pointer-events: none; border: none; background: #fff;"></iframe>
                         </div>
+                        <div style="font-size: 10px; color: #888; margin-top: 4px; text-align: center;">Click to preview</div>
                     </div>
                 </div>
                 <div style="display: flex; gap: 8px;">
-                    <button class="revert-btn" style="flex: 1; padding: 8px 12px; background: transparent; color: #aaa; border: 1px solid #444; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.2s;">↩ Undo change</button>
-                    <button class="keep-btn" style="flex: 1; padding: 8px 12px; background: #667eea; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.2s;">✓ Keep change</button>
+                    <button class="revert-btn" style="flex: 1; padding: 10px 12px; background: transparent; color: #aaa; border: 1px solid #444; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.2s;">↩ Undo change</button>
+                    <button class="keep-btn" style="flex: 1; padding: 10px 12px; background: #667eea; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.2s;">✓ Keep change</button>
                 </div>
             `;
 
             if (existingMsg) {
                 existingMsg.querySelector('.chat-message-content').innerHTML = comparisonHtml;
 
-                // Load HTML into iframes after they're in the DOM
+                // Load HTML into iframes using blob URLs for better rendering
                 setTimeout(() => {
                     const beforeIframe = document.getElementById(beforeId);
                     const afterIframe = document.getElementById(afterId);
 
                     if (beforeIframe) {
-                        beforeIframe.srcdoc = beforeHTML;
+                        const beforeBlob = new Blob([beforeHTML], { type: 'text/html' });
+                        beforeIframe.src = URL.createObjectURL(beforeBlob);
                     }
                     if (afterIframe) {
-                        afterIframe.srcdoc = afterHTML;
+                        const afterBlob = new Blob([afterHTML], { type: 'text/html' });
+                        afterIframe.src = URL.createObjectURL(afterBlob);
                     }
                 }, 50);
 
-                // Add hover effects
+                // Get card elements
+                const beforeCard = existingMsg.querySelector('.before-card');
+                const afterCard = existingMsg.querySelector('.after-card');
                 const revertBtn = existingMsg.querySelector('.revert-btn');
                 const keepBtn = existingMsg.querySelector('.keep-btn');
 
+                // Function to update card selection UI
+                const updateCardSelection = (selectBefore) => {
+                    if (selectBefore) {
+                        beforeCard.style.border = '2px solid #f59e0b';
+                        afterCard.style.border = '2px solid transparent';
+                        beforeCard.querySelector('div:first-child').innerHTML = 'Before <span style="color: #f59e0b;">(previewing)</span>';
+                        afterCard.querySelector('div:first-child').textContent = 'After';
+                    } else {
+                        beforeCard.style.border = '2px solid transparent';
+                        afterCard.style.border = '2px solid #667eea';
+                        beforeCard.querySelector('div:first-child').textContent = 'Before';
+                        afterCard.querySelector('div:first-child').innerHTML = 'After <span style="color: #667eea;">(current)</span>';
+                    }
+                };
+
+                // Click handlers for cards - preview in main iframe
+                if (beforeCard) {
+                    beforeCard.onclick = () => {
+                        previewingBefore = true;
+                        updatePreviewFrameNew(beforeHTML);
+                        updateCardSelection(true);
+                    };
+                }
+
+                if (afterCard) {
+                    afterCard.onclick = () => {
+                        previewingBefore = false;
+                        updatePreviewFrameNew(afterHTML);
+                        updateCardSelection(false);
+                    };
+                }
+
+                // Button hover effects
                 if (revertBtn) {
                     revertBtn.onmouseenter = () => { revertBtn.style.background = '#333'; revertBtn.style.borderColor = '#666'; };
                     revertBtn.onmouseleave = () => { revertBtn.style.background = 'transparent'; revertBtn.style.borderColor = '#444'; };
                     revertBtn.onclick = () => {
+                        // Confirm revert to before version
                         currentHTML = beforeHTML;
                         htmlHistory.pop();
                         updatePreviewFrameNew(currentHTML);
@@ -3849,6 +3893,9 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                     keepBtn.onmouseenter = () => { keepBtn.style.background = '#5567d5'; };
                     keepBtn.onmouseleave = () => { keepBtn.style.background = '#667eea'; };
                     keepBtn.onclick = () => {
+                        // Confirm keeping the after version
+                        currentHTML = afterHTML;
+                        updatePreviewFrameNew(currentHTML);
                         existingMsg.querySelector('.chat-message-content').innerHTML = `<div style="color: #10b981;">✓ ${summary}</div>`;
                         showToast('Changes kept', 'success');
                     };
