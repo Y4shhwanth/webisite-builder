@@ -3768,35 +3768,49 @@ Use find_and_replace or modify_class to make these structural fixes.`,
             `;
 
             popup.innerHTML = `
-                <div style="font-size: 11px; color: #667eea; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Replace Selected Text</div>
+                <div style="font-size: 11px; color: #667eea; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Edit Selected Text</div>
                 <div style="font-size: 12px; color: #888; margin-bottom: 10px; padding: 8px; background: #2a2a2a; border-radius: 6px; border-left: 3px solid #667eea;">
                     "${selectedText.length > 60 ? selectedText.substring(0, 60) + '...' : selectedText}"
                 </div>
-                <input type="text" class="replace-input" placeholder="Enter replacement text..." style="width: 100%; padding: 10px 12px; background: #2a2a2a; border: 1px solid #444; border-radius: 6px; color: #fff; font-size: 14px; outline: none; box-sizing: border-box;">
-                <div style="display: flex; gap: 8px; margin-top: 10px;">
+                <input type="text" class="replace-input" placeholder="New text (leave empty to keep same)" style="width: 100%; padding: 10px 12px; background: #2a2a2a; border: 1px solid #444; border-radius: 6px; color: #fff; font-size: 14px; outline: none; box-sizing: border-box; margin-bottom: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label style="font-size: 12px; color: #999;">Color:</label>
+                    <input type="color" class="color-input" value="#667eea" style="width: 36px; height: 28px; border: none; border-radius: 4px; cursor: pointer; padding: 0; background: transparent;">
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: #888;">
+                        <input type="checkbox" class="apply-color-checkbox" style="cursor: pointer;"> Apply color
+                    </label>
+                </div>
+                <div style="display: flex; gap: 8px; margin-top: 12px;">
                     <button class="btn-cancel" style="flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid #444; cursor: pointer; font-size: 13px; background: #2a2a2a; color: #ccc; transition: all 0.2s;">Cancel</button>
-                    <button class="btn-replace" style="flex: 1; padding: 8px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; background: #667eea; color: white; transition: all 0.2s;">Replace</button>
+                    <button class="btn-apply" style="flex: 1; padding: 8px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; background: #667eea; color: white; transition: all 0.2s;">Apply</button>
                 </div>
             `;
 
             document.body.appendChild(popup);
 
             const input = popup.querySelector('.replace-input');
+            const colorInput = popup.querySelector('.color-input');
+            const applyColorCheckbox = popup.querySelector('.apply-color-checkbox');
             input.focus();
 
-            // Handle replace
-            const doReplace = async () => {
+            // Handle apply
+            const doApply = async () => {
                 const newText = input.value.trim();
-                if (newText && newText !== selectedText) {
-                    popup.remove();
-                    await applySelectedTextReplace(selectedText, newText, parentElement);
-                } else if (!newText) {
+                const applyColor = applyColorCheckbox.checked;
+                const colorValue = colorInput.value;
+
+                // Need at least one change (text or color)
+                if (!newText && !applyColor) {
                     input.style.border = '1px solid #ef4444';
-                    input.placeholder = 'Please enter replacement text';
+                    input.placeholder = 'Enter text or select color';
+                    return;
                 }
+
+                popup.remove();
+                await applySelectedTextReplace(selectedText, newText || selectedText, parentElement, applyColor ? colorValue : null);
             };
 
-            popup.querySelector('.btn-replace').onclick = doReplace;
+            popup.querySelector('.btn-apply').onclick = doApply;
 
             // Handle cancel
             popup.querySelector('.btn-cancel').onclick = () => {
@@ -3804,11 +3818,11 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                 doc.getSelection()?.removeAllRanges();
             };
 
-            // Handle Enter to replace, Escape to cancel
+            // Handle Enter to apply, Escape to cancel
             input.onkeydown = (e) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
-                    doReplace();
+                    doApply();
                 }
                 if (e.key === 'Escape') {
                     popup.remove();
@@ -3818,11 +3832,11 @@ Use find_and_replace or modify_class to make these structural fixes.`,
 
             // Hover effects
             const btnCancel = popup.querySelector('.btn-cancel');
-            const btnReplace = popup.querySelector('.btn-replace');
+            const btnApply = popup.querySelector('.btn-apply');
             btnCancel.onmouseenter = () => { btnCancel.style.background = '#3a3a3a'; };
             btnCancel.onmouseleave = () => { btnCancel.style.background = '#2a2a2a'; };
-            btnReplace.onmouseenter = () => { btnReplace.style.background = '#5567d5'; };
-            btnReplace.onmouseleave = () => { btnReplace.style.background = '#667eea'; };
+            btnApply.onmouseenter = () => { btnApply.style.background = '#5567d5'; };
+            btnApply.onmouseleave = () => { btnApply.style.background = '#667eea'; };
 
             // Close on click outside (with delay to prevent immediate close)
             setTimeout(() => {
@@ -3836,12 +3850,31 @@ Use find_and_replace or modify_class to make these structural fixes.`,
             }, 200);
         }
 
-        // Apply selected text replacement with layout restructuring
-        async function applySelectedTextReplace(oldText, newText, parentElement) {
+        // Apply selected text replacement with layout restructuring and optional color
+        async function applySelectedTextReplace(oldText, newText, parentElement, colorValue = null) {
             const beforeHTML = currentHTML;
 
-            addChatMessageNew('user', `Replace: "${oldText.substring(0, 40)}${oldText.length > 40 ? '...' : ''}" → "${newText.substring(0, 40)}${newText.length > 40 ? '...' : ''}"`);
-            const loadingMsg = addChatMessageNew('assistant', '⏳ Replacing text and adjusting layout...');
+            // Build user message
+            let userMsg = '';
+            if (oldText !== newText) {
+                userMsg = `Replace: "${oldText.substring(0, 30)}${oldText.length > 30 ? '...' : ''}" → "${newText.substring(0, 30)}${newText.length > 30 ? '...' : ''}"`;
+            }
+            if (colorValue) {
+                userMsg += (userMsg ? ' | ' : '') + `Color: ${colorValue}`;
+            }
+            addChatMessageNew('user', userMsg);
+
+            const loadingMsg = addChatMessageNew('assistant', '⏳ Applying changes...');
+
+            // Build instruction
+            let instruction = '';
+            if (oldText !== newText) {
+                instruction = `Replace ONLY the text "${oldText}" with "${newText}". `;
+            }
+            if (colorValue) {
+                instruction += `Change the color of the text "${newText}" to ${colorValue}. `;
+            }
+            instruction += `IMPORTANT: If the new text is longer or shorter than the original, you MUST adjust the layout, spacing, padding, font-size, or container width/height as needed to ensure the text fits perfectly without overflow or awkward spacing. The final result should look professionally designed with proper visual balance.`;
 
             try {
                 const response = await fetch(`${AI_BASE}/api/edit/optimized`, {
@@ -3849,7 +3882,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         html: currentHTML,
-                        edit_instruction: `Replace ONLY the text "${oldText}" with "${newText}". IMPORTANT: If the new text is longer or shorter than the original, you MUST adjust the layout, spacing, padding, font-size, or container width/height as needed to ensure the text fits perfectly without overflow or awkward spacing. The final result should look professionally designed with proper visual balance.`,
+                        edit_instruction: instruction,
                         selected_element: parentElement ? {
                             selector: getSelector(parentElement),
                             tag: parentElement.tagName?.toLowerCase(),
@@ -3864,9 +3897,18 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                     htmlHistory.push(currentHTML);
                     currentHTML = data.html;
                     updatePreviewFrameNew(currentHTML);
-                    showBeforeAfterComparison(beforeHTML, currentHTML, `Replaced "${oldText.substring(0, 20)}..." with "${newText.substring(0, 20)}..."`, loadingMsg);
+
+                    // Build summary
+                    let summary = '';
+                    if (oldText !== newText) {
+                        summary = `Changed text to "${newText.substring(0, 20)}..."`;
+                    }
+                    if (colorValue) {
+                        summary += (summary ? ' and ' : '') + `applied color ${colorValue}`;
+                    }
+                    showBeforeAfterComparison(beforeHTML, currentHTML, summary, loadingMsg);
                 } else {
-                    loadingMsg.querySelector('.chat-message-content').innerHTML = '⚠️ Could not replace text. Try using the chat instead.';
+                    loadingMsg.querySelector('.chat-message-content').innerHTML = '⚠️ Could not apply changes. Try using the chat instead.';
                 }
             } catch (error) {
                 loadingMsg.querySelector('.chat-message-content').innerHTML = `❌ Error: ${error.message}`;
