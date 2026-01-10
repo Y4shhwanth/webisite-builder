@@ -1622,7 +1622,6 @@
         let editModeEnabled = false;
         let selectedElement = null;
         let selectedComponent = null;
-        let lastSelectionMessage = null; // Track selection message to avoid chat clutter
         let components = [];
         let htmlHistory = [];
         let designContext = null;  // Store design context (fonts, colors, sections)
@@ -3615,17 +3614,12 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                         color_classes: getColorClasses(e.target)
                     };
 
-                    // Show selection in chat - special handling for images
-                    // Remove previous selection message to avoid chat clutter
-                    if (lastSelectionMessage && lastSelectionMessage.parentNode) {
-                        lastSelectionMessage.remove();
-                    }
-
+                    // Show selection feedback as toast instead of chat message to keep chat clean
                     if (e.target.tagName.toLowerCase() === 'img') {
-                        lastSelectionMessage = showSelectedImageInChat(e.target);
+                        showToast('Image selected - describe changes in chat', 'success');
                     } else {
-                        const selectedText = e.target.textContent?.substring(0, 50) || e.target.tagName;
-                        lastSelectionMessage = addChatMessageNew('assistant', `📍 Selected: "${selectedText}${selectedText.length >= 50 ? '...' : ''}" - Now tell me what to change!`);
+                        const selectedText = e.target.textContent?.substring(0, 30) || e.target.tagName;
+                        showToast(`Selected: "${selectedText}${selectedText.length >= 30 ? '...' : ''}"`, 'success');
                     }
                 });
 
