@@ -34,6 +34,7 @@
             display: flex;
             flex-direction: column;
             height: 100vh;
+            overflow: hidden;
         }
 
         .chat-panel-header {
@@ -61,6 +62,7 @@
             flex: 1;
             overflow-y: auto;
             padding: 20px;
+            min-height: 0;
         }
 
         .chat-message {
@@ -163,6 +165,8 @@
             display: flex;
             flex-direction: column;
             height: 100%;
+            overflow: hidden;
+            min-height: 0;
         }
 
         .history-back-btn {
@@ -2314,6 +2318,7 @@
         let htmlHistory = [];
         let designContext = null;  // Store design context (fonts, colors, sections)
         let currentDeviceMode = 'desktop';
+        let currentSelectionMsgId = null;  // Track current selection message to remove on new selection
         let currentZoom = 100;
         let historyMetadata = []; // Store metadata for history timeline
 
@@ -4436,11 +4441,13 @@ Use find_and_replace or modify_class to make these structural fixes.`,
         function addChatMessageNew(role, content) {
             const container = document.getElementById('chatMessagesNew');
             const messageDiv = document.createElement('div');
+            const msgId = 'chat-msg-' + Date.now();
+            messageDiv.id = msgId;
             messageDiv.className = `chat-message ${role}`;
             messageDiv.innerHTML = `<div class="chat-message-content">${content}</div>`;
             container.appendChild(messageDiv);
             container.scrollTop = container.scrollHeight;
-            return messageDiv;
+            return msgId;
         }
 
         async function sendChatMessageNew() {
@@ -4692,13 +4699,20 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                         color_classes: getColorClasses(e.target)
                     };
 
+                    // Remove previous selection message if exists
+                    if (currentSelectionMsgId) {
+                        const prevMsg = document.getElementById(currentSelectionMsgId);
+                        if (prevMsg) prevMsg.remove();
+                    }
+
                     // Show selection in chat
                     if (e.target.tagName.toLowerCase() === 'img') {
-                        showSelectedImageInChat(e.target);
+                        const msgEl = showSelectedImageInChat(e.target);
+                        currentSelectionMsgId = msgEl?.id || null;
                     } else {
                         const selectedText = e.target.textContent?.substring(0, 50) || e.target.tagName;
                         const tagName = e.target.tagName.toLowerCase();
-                        addChatMessageNew('assistant', `📍 Selected <strong>${tagName}</strong>: "${selectedText}${selectedText.length >= 50 ? '...' : ''}"<br><span style="color: #888; font-size: 12px;">Tell me what changes you'd like to make.</span>`);
+                        currentSelectionMsgId = addChatMessageNew('assistant', `📍 Selected <strong>${tagName}</strong>: "${selectedText}${selectedText.length >= 50 ? '...' : ''}"<br><span style="color: #b0b0b0; font-size: 12px;">Tell me what changes you'd like to make.</span>`);
                     }
                 });
 
@@ -5057,6 +5071,8 @@ Use find_and_replace or modify_class to make these structural fixes.`,
         function addChatMessageNewHtml(role, htmlContent) {
             const container = document.getElementById('chatMessagesNew');
             const messageDiv = document.createElement('div');
+            const msgId = 'chat-msg-' + Date.now();
+            messageDiv.id = msgId;
             messageDiv.className = `chat-message ${role}`;
             messageDiv.innerHTML = `
                 <div class="chat-message-avatar">${role === 'user' ? '👤' : '🤖'}</div>
