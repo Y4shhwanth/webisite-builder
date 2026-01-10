@@ -157,86 +157,35 @@
             transform: translateY(-1px);
         }
 
-        /* ========== SUGGESTION CHIPS ========== */
-        .suggestion-chips-container {
-            padding: 10px 16px;
-            border-top: 1px solid #2a2a2a;
-            background: #1a1a1a;
-        }
-
-        .suggestion-chips-label {
-            font-size: 10px;
-            color: #999;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-        }
-
-        .suggestion-chips {
+        /* ========== CHAT/HISTORY VIEWS ========== */
+        .chat-view,
+        .history-view {
             display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
+            flex-direction: column;
+            height: 100%;
         }
 
-        .suggestion-chip {
-            padding: 8px 14px;
-            background: rgba(102, 126, 234, 0.15);
-            border: 1px solid rgba(102, 126, 234, 0.3);
-            border-radius: 18px;
-            font-size: 12px;
-            font-weight: 500;
-            color: #e0e0e0;
-            cursor: pointer;
-            transition: all 0.2s;
+        .history-back-btn {
             display: flex;
             align-items: center;
-            gap: 5px;
-            animation: chipFadeIn 0.2s ease forwards;
-            opacity: 0;
-        }
-
-        .suggestion-chip:hover {
-            background: rgba(102, 126, 234, 0.3);
-            border-color: #667eea;
-            color: #fff;
-            transform: translateY(-1px);
-        }
-
-        @keyframes chipFadeIn {
-            from { opacity: 0; transform: translateY(5px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .suggestion-chip:nth-child(1) { animation-delay: 0ms; }
-        .suggestion-chip:nth-child(2) { animation-delay: 40ms; }
-        .suggestion-chip:nth-child(3) { animation-delay: 80ms; }
-        .suggestion-chip:nth-child(4) { animation-delay: 120ms; }
-        .suggestion-chip:nth-child(5) { animation-delay: 160ms; }
-
-        .suggestion-chip-icon {
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 6px;
+            color: #e0e0e0;
             font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-left: auto;
+        }
+
+        .history-back-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
         }
 
         /* ========== HISTORY TIMELINE ========== */
-        .history-panel {
-            position: fixed;
-            left: 380px;
-            top: 0;
-            bottom: 0;
-            width: 280px;
-            background: #1a1a1a;
-            border-right: 1px solid #2a2a2a;
-            transform: translateX(-100%);
-            transition: transform 0.3s ease;
-            z-index: 100;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 4px 0 20px rgba(0,0,0,0.3);
-        }
-
-        .history-panel.open {
-            transform: translateX(0);
-        }
 
         .history-panel-header {
             padding: 16px;
@@ -1955,31 +1904,44 @@
 <body>
     <!-- NEW LOVABLE-STYLE LAYOUT -->
     <div class="app-container">
-        <!-- LEFT PANEL - Chat -->
+        <!-- LEFT PANEL - Chat / History -->
         <div class="chat-panel">
-            <div class="chat-panel-header">
-                <span class="chat-panel-logo">AI Builder</span>
-                <span class="chat-panel-title">by Topmate</span>
-            </div>
+            <!-- Chat View -->
+            <div class="chat-view" id="chatView">
+                <div class="chat-panel-header">
+                    <span class="chat-panel-logo">AI Builder</span>
+                    <span class="chat-panel-title">by Topmate</span>
+                </div>
 
-            <div class="chat-messages-container" id="chatMessagesNew">
-                <!-- Messages appear here -->
-            </div>
+                <div class="chat-messages-container" id="chatMessagesNew">
+                    <!-- Messages appear here -->
+                </div>
 
-            <!-- Suggestion Chips -->
-            <div class="suggestion-chips-container" id="suggestionChipsContainer">
-                <div class="suggestion-chips-label">Quick Actions</div>
-                <div class="suggestion-chips" id="suggestionChips">
-                    <!-- Chips populated dynamically -->
+                <div class="chat-input-container">
+                    <div class="chat-input-wrapper">
+                        <textarea class="chat-input" id="chatInputNew" placeholder="Describe what you want to change..." rows="3" onkeydown="handleChatKeydownNew(event)"></textarea>
+                        <div class="chat-input-actions">
+                            <span class="chat-input-hint">Press Enter to send</span>
+                            <button class="chat-send-btn" onclick="sendChatMessageNew()">Send</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="chat-input-container">
-                <div class="chat-input-wrapper">
-                    <textarea class="chat-input" id="chatInputNew" placeholder="Describe what you want to change..." rows="3" onkeydown="handleChatKeydownNew(event)"></textarea>
-                    <div class="chat-input-actions">
-                        <span class="chat-input-hint">Press Enter to send</span>
-                        <button class="chat-send-btn" onclick="sendChatMessageNew()">Send</button>
+            <!-- History View (hidden by default) -->
+            <div class="history-view" id="historyView" style="display: none;">
+                <div class="chat-panel-header">
+                    <span class="chat-panel-logo">Version History</span>
+                    <button class="history-back-btn" onclick="toggleHistoryPanel()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"/>
+                        </svg>
+                        Back to Chat
+                    </button>
+                </div>
+                <div class="history-timeline" id="historyTimeline">
+                    <div class="history-empty">
+                        Make some edits to see version history here.
                     </div>
                 </div>
             </div>
@@ -2313,19 +2275,6 @@
 
     <!-- Toast Notification -->
     <div class="toast" id="toast"></div>
-
-    <!-- History Panel -->
-    <div class="history-panel" id="historyPanel">
-        <div class="history-panel-header">
-            <span class="history-panel-title">Version History</span>
-            <button class="history-panel-close" onclick="toggleHistoryPanel()">×</button>
-        </div>
-        <div class="history-timeline" id="historyTimeline">
-            <div class="history-empty">
-                Make some edits to see version history here.
-            </div>
-        </div>
-    </div>
 
     <script>
         // ========== CONFIGURATION ==========
@@ -4175,91 +4124,6 @@ Use find_and_replace or modify_class to make these structural fixes.`,
             document.getElementById('zoomLevel').textContent = `${currentZoom}%`;
         }
 
-        // ========== SUGGESTION CHIPS ==========
-        const DEFAULT_SUGGESTIONS = [
-            { icon: '🎨', text: 'Change colors', prompt: 'Change the color scheme to ' },
-            { icon: '📝', text: 'Edit text', prompt: 'Change the text to ' },
-            { icon: '➕', text: 'Add section', prompt: 'Add a new section for ' },
-            { icon: '✨', text: 'Make it modern', prompt: 'Make this design more modern and appealing' },
-            { icon: '📱', text: 'Mobile friendly', prompt: 'Make this more mobile responsive' }
-        ];
-
-        const ELEMENT_SUGGESTIONS = {
-            'h1': [
-                { icon: '📏', text: 'Resize', prompt: 'Make this heading larger' },
-                { icon: '🎨', text: 'Color', prompt: 'Change this heading color to ' },
-                { icon: '✏️', text: 'Edit', prompt: 'Change this heading text to ' }
-            ],
-            'h2': [
-                { icon: '📏', text: 'Resize', prompt: 'Make this heading larger' },
-                { icon: '🎨', text: 'Color', prompt: 'Change this heading color to ' },
-                { icon: '✏️', text: 'Edit', prompt: 'Change this heading text to ' }
-            ],
-            'img': [
-                { icon: '🔄', text: 'Replace', prompt: 'Replace this image with URL: ' },
-                { icon: '📐', text: 'Resize', prompt: 'Make this image larger' },
-                { icon: '🔘', text: 'Round corners', prompt: 'Add rounded corners to this image' },
-                { icon: '🗑️', text: 'Remove', prompt: 'Remove this image' }
-            ],
-            'button': [
-                { icon: '🎨', text: 'Style', prompt: 'Change this button style to ' },
-                { icon: '📝', text: 'Text', prompt: 'Change button text to ' },
-                { icon: '📏', text: 'Size', prompt: 'Make this button larger' }
-            ],
-            'p': [
-                { icon: '✏️', text: 'Edit', prompt: 'Change this text to ' },
-                { icon: '📝', text: 'Expand', prompt: 'Expand this text with more details' },
-                { icon: '🎨', text: 'Color', prompt: 'Change this text color to ' }
-            ],
-            'section': [
-                { icon: '🎨', text: 'Background', prompt: 'Change this section background to ' },
-                { icon: '📐', text: 'Spacing', prompt: 'Add more padding to this section' },
-                { icon: '🗑️', text: 'Remove', prompt: 'Remove this entire section' }
-            ],
-            'div': [
-                { icon: '🎨', text: 'Style', prompt: 'Change the style of this element to ' },
-                { icon: '📐', text: 'Layout', prompt: 'Adjust the layout of this element' }
-            ]
-        };
-
-        function updateSuggestionChips() {
-            const container = document.getElementById('suggestionChips');
-            if (!container) return;
-
-            let suggestions = [...DEFAULT_SUGGESTIONS];
-
-            // Add element-specific suggestions if an element is selected
-            if (selectedComponent && selectedComponent.tag) {
-                const tag = selectedComponent.tag.toLowerCase();
-                const elementSuggestions = ELEMENT_SUGGESTIONS[tag];
-                if (elementSuggestions) {
-                    suggestions = [...elementSuggestions, ...DEFAULT_SUGGESTIONS.slice(0, 2)];
-                }
-            }
-
-            // Limit to 5 suggestions
-            suggestions = suggestions.slice(0, 5);
-
-            container.innerHTML = suggestions.map((s, i) => `
-                <button class="suggestion-chip" onclick="useSuggestionChip('${s.prompt.replace(/'/g, "\\'")}')" style="animation-delay: ${i * 40}ms;">
-                    <span class="suggestion-chip-icon">${s.icon}</span>
-                    ${s.text}
-                </button>
-            `).join('');
-        }
-
-        function useSuggestionChip(prompt) {
-            const input = document.getElementById('chatInputNew');
-            if (input) {
-                input.value = prompt;
-                input.focus();
-                input.setSelectionRange(input.value.length, input.value.length);
-            }
-        }
-
-        // Initialize suggestion chips on page load
-        document.addEventListener('DOMContentLoaded', updateSuggestionChips);
-
         // ========== KEYBOARD SHORTCUTS ==========
         function setupKeyboardShortcuts() {
             document.addEventListener('keydown', (e) => {
@@ -4347,7 +4211,6 @@ Use find_and_replace or modify_class to make these structural fixes.`,
 
             selectedElement = null;
             selectedComponent = null;
-            updateSuggestionChips();
         }
 
         function showShortcutsHelp() {
@@ -4402,11 +4265,18 @@ Use find_and_replace or modify_class to make these structural fixes.`,
 
         // ========== HISTORY TIMELINE ==========
         function toggleHistoryPanel() {
-            const panel = document.getElementById('historyPanel');
-            panel.classList.toggle('open');
+            const chatView = document.getElementById('chatView');
+            const historyView = document.getElementById('historyView');
 
-            if (panel.classList.contains('open')) {
+            if (historyView.style.display === 'none') {
+                // Show history, hide chat
+                chatView.style.display = 'none';
+                historyView.style.display = 'flex';
                 renderHistoryTimeline();
+            } else {
+                // Show chat, hide history
+                chatView.style.display = 'flex';
+                historyView.style.display = 'none';
             }
         }
 
@@ -4830,9 +4700,6 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                         const tagName = e.target.tagName.toLowerCase();
                         addChatMessageNew('assistant', `📍 Selected <strong>${tagName}</strong>: "${selectedText}${selectedText.length >= 50 ? '...' : ''}"<br><span style="color: #888; font-size: 12px;">Tell me what changes you'd like to make.</span>`);
                     }
-
-                    // Update suggestion chips based on selected element
-                    updateSuggestionChips();
                 });
 
                 // Double click - inline text editing (for entire element)
