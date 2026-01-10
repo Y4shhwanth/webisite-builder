@@ -4447,7 +4447,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
             messageDiv.innerHTML = `<div class="chat-message-content">${content}</div>`;
             container.appendChild(messageDiv);
             container.scrollTop = container.scrollHeight;
-            return msgId;
+            return messageDiv;
         }
 
         async function sendChatMessageNew() {
@@ -4485,8 +4485,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                             html: currentHTML,
                             edit_instruction: message,
                             design_context: designContext,
-                            selected_element: selectedElementData,
-                            use_browserbase: true  // Enable Browserbase for visual verification
+                            selected_element: selectedElementData
                         })
                     });
 
