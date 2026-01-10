@@ -3921,8 +3921,8 @@ Use find_and_replace or modify_class to make these structural fixes.`,
 
             const messageHtml = `
                 <div style="margin-bottom: 8px;">📍 Selected image:</div>
-                <div style="background: #2a2a2a; border-radius: 8px; padding: 8px; margin-bottom: 8px;">
-                    <img src="${imgSrc}" alt="${imgAlt}" style="max-width: 200px; max-height: 150px; border-radius: 6px; display: block;">
+                <div style="display: inline-block; border-radius: 8px; overflow: hidden; margin-bottom: 8px;">
+                    <img src="${imgSrc}" alt="${imgAlt}" style="max-width: 200px; max-height: 150px; border-radius: 6px; display: block; object-fit: contain;">
                 </div>
                 <div style="font-size: 13px; color: #888;">Tell me to replace it with a new image URL, or describe changes.</div>
             `;
@@ -3958,15 +3958,15 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                 <div style="display: flex; gap: 10px; margin-bottom: 12px;">
                     <div class="preview-card before-card" style="flex: 1; min-width: 0; cursor: pointer; padding: 8px; border-radius: 8px; border: 2px solid #333; background: #1e1e1e; transition: all 0.2s;">
                         <div style="font-size: 11px; color: #999; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Before</div>
-                        <div class="preview-container" style="border-radius: 4px; overflow: hidden; background: #fff; width: 100%; height: 100px; position: relative;">
-                            <iframe id="${beforeId}" style="position: absolute; top: 0; left: 0; width: 1280px; height: 900px; transform: scale(0.12); transform-origin: top left; pointer-events: none; border: none; background: #fff;"></iframe>
+                        <div class="preview-container" style="border-radius: 4px; overflow: hidden; width: 100%; aspect-ratio: 16/10; position: relative;">
+                            <iframe id="${beforeId}" style="position: absolute; top: 0; left: 0; width: 1280px; height: 800px; transform-origin: top left; pointer-events: none; border: none; background: #fff;"></iframe>
                         </div>
                         <div style="font-size: 10px; color: #666; margin-top: 6px; text-align: center;">Click to preview</div>
                     </div>
                     <div class="preview-card after-card selected-card" style="flex: 1; min-width: 0; cursor: pointer; padding: 8px; border-radius: 8px; border: 2px solid #667eea; background: #1e1e1e; transition: all 0.2s;">
                         <div style="font-size: 11px; color: #667eea; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">After (current)</div>
-                        <div class="preview-container" style="border-radius: 4px; overflow: hidden; background: #fff; width: 100%; height: 100px; position: relative;">
-                            <iframe id="${afterId}" style="position: absolute; top: 0; left: 0; width: 1280px; height: 900px; transform: scale(0.12); transform-origin: top left; pointer-events: none; border: none; background: #fff;"></iframe>
+                        <div class="preview-container" style="border-radius: 4px; overflow: hidden; width: 100%; aspect-ratio: 16/10; position: relative;">
+                            <iframe id="${afterId}" style="position: absolute; top: 0; left: 0; width: 1280px; height: 800px; transform-origin: top left; pointer-events: none; border: none; background: #fff;"></iframe>
                         </div>
                         <div style="font-size: 10px; color: #666; margin-top: 6px; text-align: center;">Click to preview</div>
                     </div>
@@ -3985,13 +3985,28 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                     const beforeIframe = document.getElementById(beforeId);
                     const afterIframe = document.getElementById(afterId);
 
+                    // Calculate scale based on container width
+                    const setIframeScale = (iframe) => {
+                        if (!iframe) return;
+                        const container = iframe.parentElement;
+                        if (container) {
+                            const containerWidth = container.offsetWidth;
+                            const scale = containerWidth / 1280;
+                            iframe.style.transform = `scale(${scale})`;
+                        }
+                    };
+
                     if (beforeIframe) {
                         const beforeBlob = new Blob([beforeHTML], { type: 'text/html' });
                         beforeIframe.src = URL.createObjectURL(beforeBlob);
+                        beforeIframe.onload = () => setIframeScale(beforeIframe);
+                        setIframeScale(beforeIframe);
                     }
                     if (afterIframe) {
                         const afterBlob = new Blob([afterHTML], { type: 'text/html' });
                         afterIframe.src = URL.createObjectURL(afterBlob);
+                        afterIframe.onload = () => setIframeScale(afterIframe);
+                        setIframeScale(afterIframe);
                     }
                 }, 50);
 
