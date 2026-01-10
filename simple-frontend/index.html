@@ -3787,34 +3787,31 @@ Use find_and_replace or modify_class to make these structural fixes.`,
 
         // Show before/after comparison in chat
         function showBeforeAfterComparison(beforeHTML, afterHTML, summary, existingMsg) {
-            // Store HTML in data attributes and use unique IDs for iframes
             const beforeId = 'before-iframe-' + Date.now();
             const afterId = 'after-iframe-' + Date.now();
 
             const comparisonHtml = `
-                <div style="margin-bottom: 8px;">✅ ${summary}</div>
-                <div style="display: flex; gap: 12px; margin-top: 12px;">
-                    <div class="version-card" data-version="before" style="flex: 1; cursor: pointer; border: 2px solid transparent; border-radius: 8px; padding: 8px; background: #2a2a2a; transition: all 0.2s;">
-                        <div style="font-size: 11px; color: #888; margin-bottom: 6px;">Before</div>
-                        <div style="background: #fff; border-radius: 6px; height: 120px; overflow: hidden; position: relative;">
-                            <iframe id="${beforeId}" style="width: 1200px; height: 800px; transform: scale(0.15); transform-origin: top left; pointer-events: none; border: none; background: #fff;"></iframe>
+                <div style="margin-bottom: 10px; font-size: 13px;">✅ ${summary}</div>
+                <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                    <div class="preview-card" data-version="before" style="flex: 1; min-width: 0;">
+                        <div style="font-size: 10px; color: #999; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">Before</div>
+                        <div style="border-radius: 6px; overflow: hidden; background: #fff; height: 70px; position: relative;">
+                            <iframe id="${beforeId}" sandbox="allow-same-origin" style="position: absolute; top: 0; left: 0; width: 800px; height: 600px; transform: scale(0.117); transform-origin: top left; pointer-events: none; border: none;"></iframe>
                         </div>
-                        <button class="revert-btn" style="margin-top: 8px; width: 100%; padding: 6px; background: #444; color: #ccc; border: none; border-radius: 4px; font-size: 12px; cursor: pointer;">Use this</button>
                     </div>
-                    <div class="version-card selected" data-version="after" style="flex: 1; cursor: pointer; border: 2px solid #667eea; border-radius: 8px; padding: 8px; background: #2a2a2a; transition: all 0.2s;">
-                        <div style="font-size: 11px; color: #888; margin-bottom: 6px;">After (current)</div>
-                        <div style="background: #fff; border-radius: 6px; height: 120px; overflow: hidden; position: relative;">
-                            <iframe id="${afterId}" style="width: 1200px; height: 800px; transform: scale(0.15); transform-origin: top left; pointer-events: none; border: none; background: #fff;"></iframe>
+                    <div style="display: flex; align-items: center; color: #666; font-size: 16px;">→</div>
+                    <div class="preview-card" data-version="after" style="flex: 1; min-width: 0;">
+                        <div style="font-size: 10px; color: #999; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">After</div>
+                        <div style="border-radius: 6px; overflow: hidden; background: #fff; height: 70px; position: relative; box-shadow: 0 0 0 2px #667eea;">
+                            <iframe id="${afterId}" sandbox="allow-same-origin" style="position: absolute; top: 0; left: 0; width: 800px; height: 600px; transform: scale(0.117); transform-origin: top left; pointer-events: none; border: none;"></iframe>
                         </div>
-                        <button class="keep-btn" style="margin-top: 8px; width: 100%; padding: 6px; background: #667eea; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer;">Keep this</button>
                     </div>
                 </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="revert-btn" style="flex: 1; padding: 8px 12px; background: transparent; color: #aaa; border: 1px solid #444; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.2s;">↩ Undo change</button>
+                    <button class="keep-btn" style="flex: 1; padding: 8px 12px; background: #667eea; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.2s;">✓ Keep change</button>
+                </div>
             `;
-
-            // Store HTML for later use
-            window._beforeAfterData = window._beforeAfterData || {};
-            window._beforeAfterData[beforeId] = beforeHTML;
-            window._beforeAfterData[afterId] = afterHTML;
 
             if (existingMsg) {
                 existingMsg.querySelector('.chat-message-content').innerHTML = comparisonHtml;
@@ -3832,24 +3829,27 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                     }
                 }, 50);
 
-                // Add click handlers for version selection
+                // Add hover effects
                 const revertBtn = existingMsg.querySelector('.revert-btn');
                 const keepBtn = existingMsg.querySelector('.keep-btn');
 
                 if (revertBtn) {
+                    revertBtn.onmouseenter = () => { revertBtn.style.background = '#333'; revertBtn.style.borderColor = '#666'; };
+                    revertBtn.onmouseleave = () => { revertBtn.style.background = 'transparent'; revertBtn.style.borderColor = '#444'; };
                     revertBtn.onclick = () => {
-                        // Revert to before version
                         currentHTML = beforeHTML;
-                        htmlHistory.pop(); // Remove the after version from history
+                        htmlHistory.pop();
                         updatePreviewFrameNew(currentHTML);
-                        existingMsg.querySelector('.chat-message-content').innerHTML = '↩️ Reverted to previous version';
+                        existingMsg.querySelector('.chat-message-content').innerHTML = '<div style="color: #f59e0b;">↩ Reverted to previous version</div>';
                         showToast('Reverted to previous version', 'success');
                     };
                 }
 
                 if (keepBtn) {
+                    keepBtn.onmouseenter = () => { keepBtn.style.background = '#5567d5'; };
+                    keepBtn.onmouseleave = () => { keepBtn.style.background = '#667eea'; };
                     keepBtn.onclick = () => {
-                        existingMsg.querySelector('.chat-message-content').innerHTML = `✅ ${summary}`;
+                        existingMsg.querySelector('.chat-message-content').innerHTML = `<div style="color: #10b981;">✓ ${summary}</div>`;
                         showToast('Changes kept', 'success');
                     };
                 }
