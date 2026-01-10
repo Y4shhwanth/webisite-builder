@@ -3795,26 +3795,25 @@ Use find_and_replace or modify_class to make these structural fixes.`,
             let previewingBefore = false;
 
             const comparisonHtml = `
-                <div style="margin-bottom: 10px; font-size: 13px;">✅ ${summary}</div>
-                <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-                    <div class="preview-card before-card" style="flex: 1; min-width: 0; cursor: pointer; padding: 6px; border-radius: 8px; border: 2px solid transparent; transition: all 0.2s;">
-                        <div style="font-size: 10px; color: #999; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">Before</div>
-                        <div class="preview-container" style="border-radius: 6px; overflow: hidden; background: #fff; height: 80px; position: relative;">
-                            <iframe id="${beforeId}" style="position: absolute; top: 0; left: 0; width: 1000px; height: 700px; transform: scale(0.09); transform-origin: top left; pointer-events: none; border: none; background: #fff;"></iframe>
+                <div style="margin-bottom: 12px; font-size: 13px;">✅ ${summary}</div>
+                <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                    <div class="preview-card before-card" style="flex: 1; min-width: 0; cursor: pointer; padding: 8px; border-radius: 8px; border: 2px solid #333; background: #1e1e1e; transition: all 0.2s;">
+                        <div style="font-size: 11px; color: #999; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Before</div>
+                        <div class="preview-container" style="border-radius: 4px; overflow: hidden; background: #fff; width: 100%; height: 100px; position: relative;">
+                            <iframe id="${beforeId}" style="position: absolute; top: 0; left: 0; width: 1280px; height: 900px; transform: scale(0.12); transform-origin: top left; pointer-events: none; border: none; background: #fff;"></iframe>
                         </div>
-                        <div style="font-size: 10px; color: #888; margin-top: 4px; text-align: center;">Click to preview</div>
+                        <div style="font-size: 10px; color: #666; margin-top: 6px; text-align: center;">Click to preview</div>
                     </div>
-                    <div style="display: flex; align-items: center; color: #666; font-size: 18px; padding: 0 4px;">→</div>
-                    <div class="preview-card after-card selected-card" style="flex: 1; min-width: 0; cursor: pointer; padding: 6px; border-radius: 8px; border: 2px solid #667eea; transition: all 0.2s;">
-                        <div style="font-size: 10px; color: #999; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">After <span style="color: #667eea;">(current)</span></div>
-                        <div class="preview-container" style="border-radius: 6px; overflow: hidden; background: #fff; height: 80px; position: relative;">
-                            <iframe id="${afterId}" style="position: absolute; top: 0; left: 0; width: 1000px; height: 700px; transform: scale(0.09); transform-origin: top left; pointer-events: none; border: none; background: #fff;"></iframe>
+                    <div class="preview-card after-card selected-card" style="flex: 1; min-width: 0; cursor: pointer; padding: 8px; border-radius: 8px; border: 2px solid #667eea; background: #1e1e1e; transition: all 0.2s;">
+                        <div style="font-size: 11px; color: #667eea; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">After (current)</div>
+                        <div class="preview-container" style="border-radius: 4px; overflow: hidden; background: #fff; width: 100%; height: 100px; position: relative;">
+                            <iframe id="${afterId}" style="position: absolute; top: 0; left: 0; width: 1280px; height: 900px; transform: scale(0.12); transform-origin: top left; pointer-events: none; border: none; background: #fff;"></iframe>
                         </div>
-                        <div style="font-size: 10px; color: #888; margin-top: 4px; text-align: center;">Click to preview</div>
+                        <div style="font-size: 10px; color: #666; margin-top: 6px; text-align: center;">Click to preview</div>
                     </div>
                 </div>
                 <div style="display: flex; gap: 8px;">
-                    <button class="revert-btn" style="flex: 1; padding: 10px 12px; background: transparent; color: #aaa; border: 1px solid #444; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.2s;">↩ Undo change</button>
+                    <button class="revert-btn" style="flex: 1; padding: 10px 12px; background: #2a2a2a; color: #ccc; border: 1px solid #444; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.2s;">↩ Undo change</button>
                     <button class="keep-btn" style="flex: 1; padding: 10px 12px; background: #667eea; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.2s;">✓ Keep change</button>
                 </div>
             `;
@@ -3847,14 +3846,14 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                 const updateCardSelection = (selectBefore) => {
                     if (selectBefore) {
                         beforeCard.style.border = '2px solid #f59e0b';
-                        afterCard.style.border = '2px solid transparent';
-                        beforeCard.querySelector('div:first-child').innerHTML = 'Before <span style="color: #f59e0b;">(previewing)</span>';
-                        afterCard.querySelector('div:first-child').textContent = 'After';
+                        afterCard.style.border = '2px solid #333';
+                        beforeCard.querySelector('div:first-child').innerHTML = '<span style="color: #f59e0b;">BEFORE (previewing)</span>';
+                        afterCard.querySelector('div:first-child').innerHTML = '<span style="color: #999;">AFTER</span>';
                     } else {
-                        beforeCard.style.border = '2px solid transparent';
+                        beforeCard.style.border = '2px solid #333';
                         afterCard.style.border = '2px solid #667eea';
-                        beforeCard.querySelector('div:first-child').textContent = 'Before';
-                        afterCard.querySelector('div:first-child').innerHTML = 'After <span style="color: #667eea;">(current)</span>';
+                        beforeCard.querySelector('div:first-child').innerHTML = '<span style="color: #999;">BEFORE</span>';
+                        afterCard.querySelector('div:first-child').innerHTML = '<span style="color: #667eea;">AFTER (current)</span>';
                     }
                 };
 
@@ -3877,8 +3876,8 @@ Use find_and_replace or modify_class to make these structural fixes.`,
 
                 // Button hover effects
                 if (revertBtn) {
-                    revertBtn.onmouseenter = () => { revertBtn.style.background = '#333'; revertBtn.style.borderColor = '#666'; };
-                    revertBtn.onmouseleave = () => { revertBtn.style.background = 'transparent'; revertBtn.style.borderColor = '#444'; };
+                    revertBtn.onmouseenter = () => { revertBtn.style.background = '#3a3a3a'; revertBtn.style.borderColor = '#666'; };
+                    revertBtn.onmouseleave = () => { revertBtn.style.background = '#2a2a2a'; revertBtn.style.borderColor = '#444'; };
                     revertBtn.onclick = () => {
                         // Confirm revert to before version
                         currentHTML = beforeHTML;
