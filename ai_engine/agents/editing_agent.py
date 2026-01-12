@@ -291,8 +291,8 @@ Always return valid, complete HTML."""
         self.playwright_url = settings.PLAYWRIGHT_SERVICE_URL
         self.current_html = ""
         self.selected_element = None  # Store for auto-injection in tools
-        self.max_iterations = 4  # Balanced: enough for complex edits, but encourages efficiency
-        self.temperature = 0.15  # Low for consistency, but allows some flexibility
+        self.max_iterations = 5  # Allows for creative edits with multiple class changes
+        self.temperature = 0.2  # Slightly higher for creative judgment while staying consistent
 
         # Browserbase integration (cloud browser)
         self.browserbase: BrowserbaseService = get_browserbase_service()
