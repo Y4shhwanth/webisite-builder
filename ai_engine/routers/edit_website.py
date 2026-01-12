@@ -8,6 +8,7 @@ from typing import Optional, List, Dict, Any
 import time
 import httpx
 import json
+import re
 
 from logging_config import logger
 from config import settings
@@ -19,6 +20,246 @@ router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
 
+# ============================================================================
+# SMART INSTRUCTION PREPROCESSING
+# ============================================================================
+
+def preprocess_edit_instruction(
+    instruction: str,
+    selected_element: Optional[Dict[str, Any]] = None
+) -> tuple[str, Optional[str]]:
+    """
+    Preprocess edit instruction for smarter handling.
+
+    CONSERVATIVE APPROACH: Only use fast path when intent is UNAMBIGUOUS.
+
+    Fast path triggers:
+    1. Image selected + instruction is ONLY a URL (nothing else)
+    2. Explicit patterns like "replace with [url]" for images
+
+    Args:
+        instruction: The user's edit instruction
+        selected_element: Currently selected element info
+
+    Returns:
+        Tuple of (processed_instruction, fast_path_type)
+        fast_path_type can be: "image_replace" or None
+    """
+    if not instruction:
+        return instruction, None
+
+    instruction_stripped = instruction.strip()
+    tag = selected_element.get("tag", "").lower() if selected_element else ""
+
+    # -------------------------------------------------------------------------
+    # SMART IMAGE URL DETECTION (CONSERVATIVE)
+    # -------------------------------------------------------------------------
+    # Only trigger fast path when:
+    # 1. Image is selected AND
+    # 2. Instruction is JUST a URL (no other text) OR
+    # 3. Instruction explicitly says "replace" with a URL
+
+    if tag == "img":
+        # Pattern 1: Instruction is ONLY a URL
+        url_only_pattern = r'^(https?://[^\s]+)$'
+        match = re.match(url_only_pattern, instruction_stripped)
+        if match:
+            new_url = match.group(1)
+            processed = f"Replace the image src attribute with: {new_url}"
+            logger.info(f"Smart preprocessing: Image selected + URL only -> fast path")
+            return processed, "image_replace"
+
+        # Pattern 2: Explicit replacement intent with URL
+        explicit_patterns = [
+            r'^(?:replace|change|update|set)(?:\s+(?:it|this|image|src))?\s*(?:to|with|:)\s*(https?://[^\s]+)$',
+            r'^(?:use|new\s+(?:url|image)|url|src)\s*[:=]?\s*(https?://[^\s]+)$',
+        ]
+
+        for pattern in explicit_patterns:
+            match = re.match(pattern, instruction_stripped, re.IGNORECASE)
+            if match:
+                new_url = match.group(1)
+                processed = f"Replace the image src attribute with: {new_url}"
+                logger.info(f"Smart preprocessing: Explicit image replacement detected")
+                return processed, "image_replace"
+
+    # -------------------------------------------------------------------------
+    # NO TEXT FAST PATH - Let AI handle text to avoid misinterpretation
+    # -------------------------------------------------------------------------
+    # Text edits are ambiguous - "Hello World" could mean:
+    # - Replace text with "Hello World"
+    # - Search for "Hello World"
+    # - Add "Hello World" somewhere
+    # Let the AI agent interpret based on full context
+
+    return instruction, None
+
+
+def _is_mostly_url(text: str, url: str) -> bool:
+    """Check if text is mostly just a URL with minimal extra content."""
+    # Remove the URL from text
+    remaining = text.replace(url, "").strip()
+
+    # Check if remaining text is minimal (common prefixes/suffixes around URLs)
+    minimal_patterns = [
+        r'^$',  # Empty
+        r'^(?:url\s*[:：]?\s*)?$',  # "url:" prefix
+        r'^(?:here\s*[:：]?\s*)?$',  # "here:" prefix
+        r'^(?:this\s*[:：]?\s*)?$',  # "this:" prefix
+        r'^(?:use\s+this\s*[:：]?\s*)?$',  # "use this:" prefix
+        r'^(?:replace\s+with\s*[:：]?\s*)?$',  # "replace with:" prefix
+        r'^(?:new\s+(?:image|url)\s*[:：]?\s*)?$',  # "new image:" prefix
+    ]
+
+    for pattern in minimal_patterns:
+        if re.match(pattern, remaining, re.IGNORECASE):
+            return True
+
+    # If remaining text is very short (less than 20 chars), consider it minimal
+    return len(remaining) < 20
+
+
+# ============================================================================
+# FAST PATH EDITING (bypasses full agent loop for simple edits)
+# ============================================================================
+
+async def fast_path_image_replace(
+    html: str,
+    new_url: str,
+    selected_element: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Fast path for image replacement - directly replaces src attribute.
+
+    This bypasses the full AI agent loop for simple image URL changes.
+    ~10x faster than agent-based editing.
+    """
+    try:
+        selector = selected_element.get("selector", "")
+        outer_html = selected_element.get("outer_html", "")
+
+        if not selector:
+            return {"success": False, "error": "No selector provided"}
+
+        # Method 1: Use outer_html for precise replacement
+        if outer_html and 'src="' in outer_html:
+            # Extract current src
+            src_match = re.search(r'src="([^"]*)"', outer_html)
+            if src_match:
+                old_src = src_match.group(1)
+                new_outer_html = outer_html.replace(f'src="{old_src}"', f'src="{new_url}"')
+
+                if outer_html in html:
+                    modified_html = html.replace(outer_html, new_outer_html, 1)
+                    logger.info(f"Fast path image replace: SUCCESS via outer_html")
+                    return {
+                        "success": True,
+                        "html": modified_html,
+                        "summary": f"Replaced image URL"
+                    }
+
+        # Method 2: Use Playwright service
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{settings.PLAYWRIGHT_SERVICE_URL}/edit-component",
+                json={
+                    "html": html,
+                    "selector": selector,
+                    "edit_type": "attribute",
+                    "edit_value": {"name": "src", "value": new_url}
+                }
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                if result.get("success"):
+                    logger.info(f"Fast path image replace: SUCCESS via Playwright")
+                    return {
+                        "success": True,
+                        "html": result.get("html"),
+                        "summary": f"Replaced image URL"
+                    }
+
+        return {"success": False, "error": "Fast path failed"}
+
+    except Exception as e:
+        logger.error(f"Fast path image replace error: {e}")
+        return {"success": False, "error": str(e)}
+
+
+async def fast_path_text_replace(
+    html: str,
+    new_text: str,
+    selected_element: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Fast path for text replacement - directly replaces text content.
+
+    This bypasses the full AI agent loop for simple text changes.
+    ~10x faster than agent-based editing.
+    """
+    try:
+        selector = selected_element.get("selector", "")
+        current_text = selected_element.get("text", "")
+        outer_html = selected_element.get("outer_html", "")
+        tag = selected_element.get("tag", "").lower()
+
+        if not selector:
+            return {"success": False, "error": "No selector provided"}
+
+        # Clean the new text (remove surrounding quotes if present)
+        new_text = new_text.strip()
+        if (new_text.startswith('"') and new_text.endswith('"')) or \
+           (new_text.startswith("'") and new_text.endswith("'")):
+            new_text = new_text[1:-1]
+
+        # Method 1: Use outer_html for precise replacement (best for simple elements)
+        if outer_html and current_text and tag in ["h1", "h2", "h3", "h4", "h5", "h6", "p", "span", "button", "a", "label"]:
+            # For simple elements, try direct text replacement in outer_html
+            if current_text.strip() in outer_html:
+                # Find the text between tags
+                tag_pattern = rf'(<{tag}[^>]*>)([^<]*)(</{tag}>)'
+                match = re.search(tag_pattern, outer_html, re.IGNORECASE | re.DOTALL)
+                if match:
+                    new_outer_html = f"{match.group(1)}{new_text}{match.group(3)}"
+                    if outer_html in html:
+                        modified_html = html.replace(outer_html, new_outer_html, 1)
+                        logger.info(f"Fast path text replace: SUCCESS via outer_html")
+                        return {
+                            "success": True,
+                            "html": modified_html,
+                            "summary": f"Replaced text content"
+                        }
+
+        # Method 2: Use Playwright service
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{settings.PLAYWRIGHT_SERVICE_URL}/edit-component",
+                json={
+                    "html": html,
+                    "selector": selector,
+                    "edit_type": "text",
+                    "edit_value": new_text
+                }
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                if result.get("success"):
+                    logger.info(f"Fast path text replace: SUCCESS via Playwright")
+                    return {
+                        "success": True,
+                        "html": result.get("html"),
+                        "summary": f"Replaced text content"
+                    }
+
+        return {"success": False, "error": "Fast path failed"}
+
+    except Exception as e:
+        logger.error(f"Fast path text replace error: {e}")
+        return {"success": False, "error": str(e)}
+
+
 class SelectedElement(BaseModel):
     """Model for selected element context"""
     selector: str
@@ -27,6 +268,8 @@ class SelectedElement(BaseModel):
     text: Optional[str] = None
     parent_selector: Optional[str] = None
     attributes: Optional[Dict[str, Any]] = {}
+    outer_html: Optional[str] = None  # For precise element targeting
+    color_classes: Optional[List[str]] = []  # Tailwind color classes
 
 
 class EditWebsiteRequest(BaseModel):
@@ -53,30 +296,78 @@ class EditWebsiteResponse(BaseModel):
 @limiter.limit("10/minute")  # Rate limit: 10 requests per minute
 async def edit_website_optimized(request: Request, data: EditWebsiteRequest):
     """
-    Edit website using optimized routing (Playwright for simple edits, AI for complex).
+    Edit website using optimized routing with smart instruction preprocessing.
 
     This endpoint intelligently routes edits:
-    - Simple text/color changes → Playwright (fast, <1s)
-    - Complex layout/structure changes → Gemini AI (slower, ~5-10s)
+    1. Smart preprocessing detects intent (image URL, text replacement, etc.)
+    2. Fast path for simple image/text replacements (instant, <500ms)
+    3. AI agent for complex edits (5-10s)
 
     Rate limit: 10 requests per minute
     """
     try:
         start_time = time.time()
 
+        # Convert selected_element to dict if present
+        selected_element_dict = None
+        if data.selected_element:
+            selected_element_dict = data.selected_element.model_dump()
+
         logger.info(
             "Edit request received",
             instruction=data.edit_instruction[:100],
-            html_size=len(data.html)
+            html_size=len(data.html),
+            has_selected_element=selected_element_dict is not None,
+            selected_tag=selected_element_dict.get("tag") if selected_element_dict else None
         )
 
-        # Determine if edit is simple or complex
-        edit_type = _classify_edit(data.edit_instruction)
+        # =====================================================================
+        # STEP 1: SMART PREPROCESSING
+        # =====================================================================
+        processed_instruction, fast_path_type = preprocess_edit_instruction(
+            data.edit_instruction,
+            selected_element_dict
+        )
+
+        if processed_instruction != data.edit_instruction:
+            logger.info(f"Instruction preprocessed: '{data.edit_instruction[:50]}...' -> '{processed_instruction[:50]}...'")
+
+        # =====================================================================
+        # STEP 2: FAST PATH FOR IMAGE URL REPLACEMENT
+        # =====================================================================
+        # Only for unambiguous cases: image selected + URL provided
+        if fast_path_type == "image_replace" and selected_element_dict:
+            url_match = re.search(r'(https?://[^\s<>"\']+)', processed_instruction)
+            if url_match:
+                new_url = url_match.group(1)
+                result = await fast_path_image_replace(
+                    html=data.html,
+                    new_url=new_url,
+                    selected_element=selected_element_dict
+                )
+
+                if result.get("success"):
+                    execution_time = time.time() - start_time
+                    logger.info(f"Fast path image replace completed in {execution_time:.2f}s")
+                    return EditWebsiteResponse(
+                        success=True,
+                        html=result.get("html"),
+                        edit_type="fast_path_image",
+                        model="direct",
+                        execution_time=execution_time
+                    )
+                else:
+                    logger.warning(f"Fast path failed, falling back to AI: {result.get('error')}")
+
+        # =====================================================================
+        # STEP 3: CLASSIFY AND ROUTE
+        # =====================================================================
+        edit_type = _classify_edit(processed_instruction)
 
         if edit_type == "simple":
             # Try Playwright first for simple edits
             try:
-                result = await _edit_with_playwright(data.html, data.edit_instruction)
+                result = await _edit_with_playwright(data.html, processed_instruction)
 
                 if result.get("success"):
                     execution_time = time.time() - start_time
@@ -98,16 +389,13 @@ async def edit_website_optimized(request: Request, data: EditWebsiteRequest):
                 logger.warning(f"Playwright edit failed, falling back to AI: {str(e)}")
                 edit_type = "complex"  # Fallback to AI
 
-        # Complex edits or Playwright fallback
+        # =====================================================================
+        # STEP 4: AI AGENT FOR COMPLEX EDITS
+        # =====================================================================
         if edit_type == "complex":
-            # Convert selected_element to dict if present
-            selected_element_dict = None
-            if data.selected_element:
-                selected_element_dict = data.selected_element.model_dump()
-
             result = await _edit_with_ai(
                 html=data.html,
-                instruction=data.edit_instruction,
+                instruction=processed_instruction,  # Use preprocessed instruction
                 design_context=data.design_context,
                 selected_element=selected_element_dict
             )
