@@ -95,30 +95,6 @@ def preprocess_edit_instruction(
     return instruction, None
 
 
-def _is_mostly_url(text: str, url: str) -> bool:
-    """Check if text is mostly just a URL with minimal extra content."""
-    # Remove the URL from text
-    remaining = text.replace(url, "").strip()
-
-    # Check if remaining text is minimal (common prefixes/suffixes around URLs)
-    minimal_patterns = [
-        r'^$',  # Empty
-        r'^(?:url\s*[:：]?\s*)?$',  # "url:" prefix
-        r'^(?:here\s*[:：]?\s*)?$',  # "here:" prefix
-        r'^(?:this\s*[:：]?\s*)?$',  # "this:" prefix
-        r'^(?:use\s+this\s*[:：]?\s*)?$',  # "use this:" prefix
-        r'^(?:replace\s+with\s*[:：]?\s*)?$',  # "replace with:" prefix
-        r'^(?:new\s+(?:image|url)\s*[:：]?\s*)?$',  # "new image:" prefix
-    ]
-
-    for pattern in minimal_patterns:
-        if re.match(pattern, remaining, re.IGNORECASE):
-            return True
-
-    # If remaining text is very short (less than 20 chars), consider it minimal
-    return len(remaining) < 20
-
-
 # ============================================================================
 # FAST PATH EDITING (bypasses full agent loop for simple edits)
 # ============================================================================
@@ -184,79 +160,6 @@ async def fast_path_image_replace(
 
     except Exception as e:
         logger.error(f"Fast path image replace error: {e}")
-        return {"success": False, "error": str(e)}
-
-
-async def fast_path_text_replace(
-    html: str,
-    new_text: str,
-    selected_element: Dict[str, Any]
-) -> Dict[str, Any]:
-    """
-    Fast path for text replacement - directly replaces text content.
-
-    This bypasses the full AI agent loop for simple text changes.
-    ~10x faster than agent-based editing.
-    """
-    try:
-        selector = selected_element.get("selector", "")
-        current_text = selected_element.get("text", "")
-        outer_html = selected_element.get("outer_html", "")
-        tag = selected_element.get("tag", "").lower()
-
-        if not selector:
-            return {"success": False, "error": "No selector provided"}
-
-        # Clean the new text (remove surrounding quotes if present)
-        new_text = new_text.strip()
-        if (new_text.startswith('"') and new_text.endswith('"')) or \
-           (new_text.startswith("'") and new_text.endswith("'")):
-            new_text = new_text[1:-1]
-
-        # Method 1: Use outer_html for precise replacement (best for simple elements)
-        if outer_html and current_text and tag in ["h1", "h2", "h3", "h4", "h5", "h6", "p", "span", "button", "a", "label"]:
-            # For simple elements, try direct text replacement in outer_html
-            if current_text.strip() in outer_html:
-                # Find the text between tags
-                tag_pattern = rf'(<{tag}[^>]*>)([^<]*)(</{tag}>)'
-                match = re.search(tag_pattern, outer_html, re.IGNORECASE | re.DOTALL)
-                if match:
-                    new_outer_html = f"{match.group(1)}{new_text}{match.group(3)}"
-                    if outer_html in html:
-                        modified_html = html.replace(outer_html, new_outer_html, 1)
-                        logger.info(f"Fast path text replace: SUCCESS via outer_html")
-                        return {
-                            "success": True,
-                            "html": modified_html,
-                            "summary": f"Replaced text content"
-                        }
-
-        # Method 2: Use Playwright service
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"{settings.PLAYWRIGHT_SERVICE_URL}/edit-component",
-                json={
-                    "html": html,
-                    "selector": selector,
-                    "edit_type": "text",
-                    "edit_value": new_text
-                }
-            )
-
-            if response.status_code == 200:
-                result = response.json()
-                if result.get("success"):
-                    logger.info(f"Fast path text replace: SUCCESS via Playwright")
-                    return {
-                        "success": True,
-                        "html": result.get("html"),
-                        "summary": f"Replaced text content"
-                    }
-
-        return {"success": False, "error": "Fast path failed"}
-
-    except Exception as e:
-        logger.error(f"Fast path text replace error: {e}")
         return {"success": False, "error": str(e)}
 
 

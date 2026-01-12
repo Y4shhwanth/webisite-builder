@@ -885,60 +885,6 @@
             overflow: hidden;
         }
 
-        /* ========== DIRECT TEXT EDIT ========== */
-        .direct-edit-section {
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid #e5e5e5;
-        }
-
-        .direct-edit-label {
-            font-size: 11px;
-            color: #667eea;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-            font-weight: 600;
-        }
-
-        .direct-edit-wrapper {
-            display: flex;
-            gap: 8px;
-        }
-
-        .direct-edit-input {
-            flex: 1;
-            padding: 10px;
-            border: 1px solid #e5e5e5;
-            border-radius: 6px;
-            font-size: 13px;
-            resize: none;
-            font-family: inherit;
-        }
-
-        .direct-edit-input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .direct-edit-btn {
-            padding: 10px 16px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 500;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: all 0.2s;
-        }
-
-        .direct-edit-btn:hover {
-            opacity: 0.9;
-            transform: translateY(-1px);
-        }
-
         /* ========== QUICK ACTIONS ========== */
         .quick-actions {
             padding: 16px 20px;
@@ -4608,53 +4554,8 @@ Use find_and_replace or modify_class to make these structural fixes.`,
             const editModeStyles = `
                 <style>
                     .ai-edit-hover { outline: 2px dashed #667eea !important; cursor: pointer !important; }
-                    .ai-edit-selected { outline: 2px solid #667eea !important; background: rgba(102, 126, 234, 0.05) !important; }
-                    .ai-inline-edit-popup {
-                        position: fixed;
-                        background: #1a1a1a;
-                        border: 1px solid #333;
-                        border-radius: 8px;
-                        padding: 12px;
-                        box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-                        z-index: 99999;
-                        min-width: 300px;
-                        max-width: 500px;
-                    }
-                    .ai-inline-edit-popup textarea {
-                        width: 100%;
-                        min-height: 60px;
-                        background: #2a2a2a;
-                        border: 1px solid #444;
-                        border-radius: 6px;
-                        color: #fff;
-                        padding: 8px;
-                        font-size: 14px;
-                        resize: vertical;
-                    }
-                    .ai-inline-edit-popup .btn-row {
-                        display: flex;
-                        gap: 8px;
-                        margin-top: 8px;
-                        justify-content: flex-end;
-                    }
-                    .ai-inline-edit-popup button {
-                        padding: 6px 16px;
-                        border-radius: 6px;
-                        border: none;
-                        cursor: pointer;
-                        font-size: 13px;
-                    }
-                    .ai-inline-edit-popup .btn-save {
-                        background: #667eea;
-                        color: white;
-                    }
-                    .ai-inline-edit-popup .btn-cancel {
-                        background: #444;
-                        color: #ccc;
-                    }
-                    ::selection {
-                        background: rgba(102, 126, 234, 0.4);
-                    }
+                    .ai-edit-selected { outline: 3px solid #667eea !important; outline-offset: 2px; }
+                    ::selection { background: rgba(102, 126, 234, 0.4); }
                 </style>
             `;
 
@@ -4716,19 +4617,6 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                     }
                 });
 
-                // Double click - inline text editing (for entire element)
-                doc.body.addEventListener('dblclick', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-
-                    // Only for text elements
-                    const tag = e.target.tagName.toLowerCase();
-                    if (['img', 'video', 'iframe', 'svg', 'canvas'].includes(tag)) return;
-
-                    // Show inline edit popup
-                    showInlineEditPopup(e.target, doc, newFrame);
-                });
-
                 // Text selection - mouseup to detect selected text
                 doc.body.addEventListener('mouseup', (e) => {
                     // Small delay to ensure selection is complete
@@ -4752,85 +4640,6 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                     }, 10);
                 });
             };
-        }
-
-        // Show inline text edit popup
-        function showInlineEditPopup(element, doc, frame) {
-            // Remove any existing popup
-            const existing = doc.querySelector('.ai-inline-edit-popup');
-            if (existing) existing.remove();
-
-            // Get element position
-            const rect = element.getBoundingClientRect();
-            const frameRect = frame.getBoundingClientRect();
-
-            // Create popup in parent document (not iframe)
-            const popup = document.createElement('div');
-            popup.className = 'ai-inline-edit-popup';
-            popup.style.cssText = `
-                position: fixed;
-                top: ${frameRect.top + rect.top + rect.height + 10}px;
-                left: ${frameRect.left + rect.left}px;
-                background: #1a1a1a;
-                border: 1px solid #333;
-                border-radius: 8px;
-                padding: 12px;
-                box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-                z-index: 99999;
-                min-width: 300px;
-                max-width: 500px;
-            `;
-
-            const currentText = element.textContent || '';
-            popup.innerHTML = `
-                <div style="font-size: 12px; color: #888; margin-bottom: 8px;">Edit text directly:</div>
-                <textarea style="width: 100%; min-height: 60px; background: #2a2a2a; border: 1px solid #444; border-radius: 6px; color: #fff; padding: 8px; font-size: 14px; resize: vertical;">${currentText}</textarea>
-                <div style="display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end;">
-                    <button class="btn-cancel" style="padding: 6px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; background: #444; color: #ccc;">Cancel</button>
-                    <button class="btn-save" style="padding: 6px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; background: #667eea; color: white;">Save</button>
-                </div>
-            `;
-
-            document.body.appendChild(popup);
-
-            const textarea = popup.querySelector('textarea');
-            textarea.focus();
-            textarea.select();
-
-            // Handle save
-            popup.querySelector('.btn-save').onclick = async () => {
-                const newText = textarea.value;
-                if (newText !== currentText) {
-                    await applyInlineTextEdit(element, currentText, newText);
-                }
-                popup.remove();
-            };
-
-            // Handle cancel
-            popup.querySelector('.btn-cancel').onclick = () => {
-                popup.remove();
-            };
-
-            // Handle Enter to save (Shift+Enter for new line)
-            textarea.onkeydown = (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    popup.querySelector('.btn-save').click();
-                }
-                if (e.key === 'Escape') {
-                    popup.remove();
-                }
-            };
-
-            // Close on click outside
-            setTimeout(() => {
-                document.addEventListener('click', function closePopup(e) {
-                    if (!popup.contains(e.target)) {
-                        popup.remove();
-                        document.removeEventListener('click', closePopup);
-                    }
-                });
-            }, 100);
         }
 
         // Show text selection replacement popup

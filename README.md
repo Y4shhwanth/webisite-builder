@@ -1,16 +1,16 @@
 # AI Website Builder
 
-AI-powered website builder that generates stunning portfolio websites from Topmate profiles using Claude/Gemini with real-time editing capabilities.
+AI-powered website builder that generates portfolio websites from Topmate profiles using Claude/Gemini with real-time editing capabilities.
 
 ## Features
 
 - **One-Click Generation**: Generate professional portfolio websites from Topmate username
 - **5 Template Styles**: Modern Minimal, Bold Creative, Professional Corporate, Dark Elegant, Vibrant Gradient
-- **Smart Model Fallback**: Claude Sonnet 4 → Claude 3.5 Sonnet → Gemini 2.0 Flash
-- **Anti-Slop Design**: Production-grade system prompt that avoids generic AI aesthetics
-- **Real-Time Editing**: Natural language commands to modify your website
-- **Tailwind CSS v4 + Alpine.js**: Modern, responsive output with interactive components
-- **Production Ready**: Monitoring, logging, rate limiting, health checks
+- **Smart Model Fallback**: Claude Sonnet 4 → Claude 3.5 Sonnet → Gemini 2.0 Flash (via OpenRouter)
+- **Intelligent Editing Agent**: Tool-use based editing with visual context
+- **Smart Image Replacement**: Just paste a URL when image is selected
+- **Real-Time Preview**: Live preview with click-to-select editing
+- **Tailwind CSS v4 + Alpine.js**: Modern, responsive output
 
 ## Architecture
 
@@ -37,25 +37,14 @@ AI-powered website builder that generates stunning portfolio websites from Topma
 
 ## Tech Stack
 
-- **AI Models**:
-  - Primary: Claude Sonnet 4 (via OpenRouter)
+- **AI Models** (via OpenRouter):
+  - Primary: Claude Sonnet 4
   - Fallback: Claude 3.5 Sonnet, Gemini 2.0 Flash
-  - Direct Gemini API as final fallback
 - **Backend**: Django 5.0 + FastAPI
 - **Database**: PostgreSQL 15 + Redis 7
-- **Frontend**: Vanilla JS (no framework)
+- **Frontend**: Vanilla JS
 - **Generated Sites**: Tailwind CSS v4, Alpine.js, Google Fonts
 - **Containerization**: Docker Compose
-
-## Available Templates
-
-| Template | Description |
-|----------|-------------|
-| Modern Minimal | Clean, minimalist design with focus on content |
-| Bold & Creative | Vibrant colors and dynamic layouts |
-| Professional Corporate | Trust-building business design |
-| Dark & Elegant | Sophisticated dark theme with premium feel |
-| Vibrant Gradient | Eye-catching gradients with glass effects |
 
 ## Quick Start
 
@@ -64,92 +53,47 @@ AI-powered website builder that generates stunning portfolio websites from Topma
 - Docker and Docker Compose
 - OpenRouter API Key (get one at [openrouter.ai](https://openrouter.ai))
 
-### 1. Clone the repository
+### 1. Clone and configure
 
 ```bash
 git clone https://github.com/Y4shhwanth/webisite-builder.git
 cd webisite-builder
-```
-
-### 2. Configure environment
-
-```bash
 cp .env.example .env
-# Edit .env and add your API keys
 ```
 
-Required environment variables:
+Edit `.env` and add your API key:
 ```env
 OPENROUTER_API_KEY=your_openrouter_key
-ANTHROPIC_API_KEY=your_anthropic_key  # Optional
-GEMINI_API_KEY=your_gemini_key        # Optional
 ```
 
-### 3. Start all services
+### 2. Start services
 
 ```bash
 docker compose up -d --build
-```
-
-### 4. Run database migrations
-
-```bash
 docker exec ai_website_builder_backend python manage.py migrate
 ```
 
-### 5. Start the frontend
+### 3. Start frontend
 
 ```bash
 cd simple-frontend
 python3 -m http.server 3000
 ```
 
-### 6. Open in browser
+### 4. Open browser
 
 Navigate to http://localhost:3000
 
 ## Usage
 
 1. Enter a Topmate username (e.g., "yashwanth")
-2. Select a template style (Modern Minimal, Bold Creative, etc.)
-3. Add custom instructions (optional)
-4. Click "Generate Website"
-5. Wait 30-60 seconds for AI generation
-6. Preview your website with proper sections:
-   - Navigation → Hero → About → Services → Testimonials → CTA → Footer
-7. Use Edit Mode to make changes with AI assistance
-8. Download the HTML file
-
-### Edit Commands
-
-Use natural language to edit your website:
-- "Change header to blue"
-- "Make the text bigger"
-- "Hide the testimonials section"
-- "Change background to white"
-
-## Project Structure
-
-```
-ai-website-builder/
-├── backend/              # Django backend
-│   ├── projects/        # Projects app
-│   ├── users/           # Users app
-│   └── manage.py
-├── ai_engine/           # FastAPI AI service
-│   ├── agents/          # Agent implementations
-│   ├── mcp_tools/       # MCP tool servers
-│   ├── routers/         # API endpoints
-│   ├── services/        # Business logic
-│   └── main.py
-├── playwright/          # Fast HTML editor service
-│   ├── server.js
-│   └── Dockerfile
-├── simple-frontend/     # Single HTML frontend
-│   └── index.html
-├── docker-compose.yml
-└── README.md
-```
+2. Select a template style
+3. Click "Generate Website"
+4. Use Edit Mode to make changes:
+   - Click any element to select it
+   - Type instructions like "make it blue" or "change text to Hello"
+   - For images: just paste a URL to replace
+5. Download the HTML file
 
 ## API Endpoints
 
@@ -158,11 +102,12 @@ ai-website-builder/
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check |
-| `/api/build/website` | POST | Generate website from Topmate profile |
-| `/api/build/templates` | GET | List available templates |
-| `/api/edit/optimized` | POST | Edit website with AI |
+| `/api/build/website` | POST | Generate website |
+| `/api/build/templates` | GET | List templates |
+| `/api/edit/optimized` | POST | Edit website (smart routing) |
+| `/api/edit/agent` | POST | Edit with AI agent |
 | `/api/chat/init` | POST | Initialize chat session |
-| `/api/chat/send` | POST | Send chat message for editing |
+| `/api/chat/send` | POST | Send chat message (SSE) |
 
 ### Backend (Port 8000)
 
@@ -172,78 +117,70 @@ ai-website-builder/
 | `/api/projects/` | GET/POST | List/create projects |
 | `/api/projects/{id}/` | GET/PUT/DELETE | Project CRUD |
 
-## Health Checks
+## Project Structure
 
-```bash
-curl http://localhost:8001/health  # AI Engine
-curl http://localhost:8000/health/ # Backend
-curl http://localhost:3001/health  # Playwright
 ```
+ai-website-builder/
+├── ai_engine/           # FastAPI AI service
+│   ├── agents/          # Editing agent with tool-use
+│   ├── routers/         # API endpoints
+│   ├── services/        # Generation & prompts
+│   └── mcp_tools/       # Galactus API integration
+├── backend/             # Django backend
+│   └── projects/        # Project management
+├── playwright/          # DOM manipulation service
+│   └── server.js        # Express + Playwright
+├── simple-frontend/     # Single HTML frontend
+│   └── index.html
+└── docker-compose.yml
+```
+
+## Editing System
+
+The editing system uses a smart routing approach:
+
+1. **Fast Path** (instant): Image URL replacement when image is selected
+2. **AI Agent** (3-5s): Complex edits using Claude with tool-use
+
+### Editing Agent Tools
+
+- `edit_text` - Change text content
+- `edit_style` - Modify CSS styles
+- `edit_attribute` - Change attributes (src, href, etc.)
+- `modify_class` - Replace Tailwind classes
+- `find_and_replace` - Direct HTML replacement
+- `capture_screenshot` - Visual verification
 
 ## Development
 
 ### View logs
 
 ```bash
-docker compose logs -f           # All services
-docker compose logs -f ai_engine # Specific service
+docker compose logs -f ai_engine
 ```
 
 ### Restart services
 
 ```bash
-docker compose restart
+docker compose restart ai_engine playwright
 ```
 
-### Rebuild
+### Health checks
 
 ```bash
-docker compose up -d --build
+curl http://localhost:8001/health
+curl http://localhost:8000/health/
+curl http://localhost:3001/health
 ```
 
-### Reset database
+## Environment Variables
 
-```bash
-docker compose down -v
-docker compose up -d --build
-docker exec ai_website_builder_backend python manage.py migrate
-```
-
-## Troubleshooting
-
-### Services won't start
-
-```bash
-docker compose logs -f ai_engine
-docker compose restart
-```
-
-### Playwright not responding
-
-```bash
-docker compose up -d --build playwright
-```
-
-### Database issues
-
-```bash
-docker compose down -v
-docker compose up -d postgres redis
-docker compose up -d backend
-docker exec ai_website_builder_backend python manage.py migrate
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `OPENROUTER_API_KEY` | Yes | OpenRouter API key |
+| `GEMINI_API_KEY` | No | Direct Gemini API (fallback) |
+| `ANTHROPIC_API_KEY` | No | Direct Anthropic API |
 
 ## License
 
 MIT License
-
-## Support
-
-For issues: https://github.com/Y4shhwanth/webisite-builder/issues
