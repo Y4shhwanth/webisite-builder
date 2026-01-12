@@ -4711,7 +4711,8 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                     } else {
                         const selectedText = e.target.textContent?.substring(0, 50) || e.target.tagName;
                         const tagName = e.target.tagName.toLowerCase();
-                        currentSelectionMsgId = addChatMessageNew('assistant', `📍 Selected <strong>${tagName}</strong>: "${selectedText}${selectedText.length >= 50 ? '...' : ''}"<br><span style="color: #b0b0b0; font-size: 12px;">Tell me what changes you'd like to make.</span>`);
+                        const msgEl = addChatMessageNew('assistant', `📍 Selected <strong>${tagName}</strong>: "${selectedText}${selectedText.length >= 50 ? '...' : ''}"<br><span style="color: #b0b0b0; font-size: 12px;">Tell me what changes you'd like to make.</span>`);
+                        currentSelectionMsgId = msgEl?.id || null;
                     }
                 });
 
