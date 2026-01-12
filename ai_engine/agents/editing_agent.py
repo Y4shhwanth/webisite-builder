@@ -391,23 +391,11 @@ Make your best judgment based on this visual context.
             self.screenshots = []  # Reset screenshots for this edit session
             self.session_replay_url = None
 
-            # Skip Browserbase by default for faster edits - use local Playwright
-            # Browserbase can be enabled for debugging or visual verification if needed
-            browserbase_page = None
-            # Disabled for performance - uncomment below to enable Browserbase
-            # if self.use_browserbase:
-            #     try:
-            #         browserbase_page = await self.browserbase.connect()
-            #         if browserbase_page:
-            #             await self.browserbase.load_html(html)
-            #             self.session_replay_url = self.browserbase.get_session_replay_url()
-            #             logger.info(f"EditingAgent: Browserbase session ready - {self.session_replay_url}")
-            #             initial_screenshot = await self.browserbase.screenshot()
-            #             if initial_screenshot:
-            #                 self.screenshots.append(initial_screenshot)
-            #     except Exception as e:
-            #         logger.warning(f"EditingAgent: Browserbase init failed: {e}")
-            #         browserbase_page = None
+            # Capture initial screenshot via local Playwright (fast, no cloud latency)
+            initial_screenshot = await self._capture_local_screenshot(html)
+            if initial_screenshot:
+                self.screenshots.append(initial_screenshot)
+                logger.info("EditingAgent: Captured initial screenshot via local Playwright")
 
             # Log what we received
             logger.info(f"EditingAgent: Instruction = '{instruction}'")
@@ -522,71 +510,17 @@ Make your best judgment based on this visual context.
                         logger.info(f"EditingAgent: finalize_edit called - summary: {edit_summary}")
                         logger.info(f"EditingAgent: Using self.current_html with length: {len(final_html)}")
 
-                        # Capture final screenshot and verify if Browserbase is active
-                        verification_result = None
-                        if browserbase_page:
-                            try:
-                                # Update the browser with final HTML
-                                await self.browserbase.load_html(final_html)
-                                final_screenshot = await self.browserbase.screenshot()
-                                if final_screenshot:
-                                    self.screenshots.append(final_screenshot)
-
-                                # Verify the edit visually
-                                if len(self.screenshots) >= 2 and self.visual_verifier.is_available:
-                                    verification_result = await self.visual_verifier.verify_edit(
-                                        before_screenshot=self.screenshots[0],
-                                        after_screenshot=self.screenshots[-1],
-                                        expected_change=instruction,
-                                        element_selector=selected_element.get("selector") if selected_element else None
-                                    )
-                                    logger.info(f"EditingAgent: Visual verification - verified={verification_result.get('verified')}, confidence={verification_result.get('confidence')}")
-
-                                    # Log suggestions if verification failed
-                                    if not verification_result.get('verified') and verification_result.get('suggestions'):
-                                        logger.warning(f"EditingAgent: Verification suggestions: {verification_result.get('suggestions')}")
-
-                            except Exception as e:
-                                logger.warning(f"EditingAgent: Screenshot/verification error: {e}")
-                            finally:
-                                # Clean up Browserbase session
-                                await self.browserbase.close()
-
-                        # Build response with verification data
-                        response = {
+                        return {
                             "success": True,
                             "html": final_html,
                             "summary": edit_summary,
                             "iterations": iteration,
-                            "replay_url": self.session_replay_url,
                             "screenshots_captured": len(self.screenshots)
                         }
-
-                        # Add verification data if available
-                        if verification_result:
-                            response["verification"] = {
-                                "verified": verification_result.get("verified", False),
-                                "confidence": verification_result.get("confidence", 0),
-                                "explanation": verification_result.get("explanation", ""),
-                                "suggestions": verification_result.get("suggestions", [])
-                            }
-
-                        return response
 
                     # Update current HTML if edit was successful
                     if tool_result.get("success") and tool_result.get("html"):
                         self.current_html = tool_result["html"]
-
-                        # Capture screenshot after successful edit for visual feedback
-                        if browserbase_page and tool_name in ["modify_class", "edit_text", "edit_style", "edit_attribute", "find_and_replace"]:
-                            try:
-                                await self.browserbase.load_html(self.current_html)
-                                post_edit_screenshot = await self.browserbase.screenshot()
-                                if post_edit_screenshot:
-                                    self.screenshots.append(post_edit_screenshot)
-                                    logger.info(f"EditingAgent: Captured post-edit screenshot ({len(self.screenshots)} total)")
-                            except Exception as e:
-                                logger.warning(f"EditingAgent: Post-edit screenshot failed: {e}")
 
                     tool_results.append({
                         "tool_call_id": tool_id,
@@ -599,34 +533,20 @@ Make your best judgment based on this visual context.
                 messages.extend(tool_results)
 
             # If we exhausted iterations, return current state
-            # Clean up Browserbase session
-            if browserbase_page:
-                try:
-                    await self.browserbase.close()
-                except Exception:
-                    pass
-
             return {
                 "success": True,
                 "html": self.current_html,
                 "summary": edit_summary or "Edit completed",
                 "iterations": iteration,
-                "replay_url": self.session_replay_url
+                "screenshots_captured": len(self.screenshots)
             }
 
         except Exception as e:
             logger.error(f"EditingAgent: Error - {str(e)}")
-            # Clean up Browserbase session on error
-            if self.use_browserbase:
-                try:
-                    await self.browserbase.close()
-                except Exception:
-                    pass
             return {
                 "success": False,
                 "error": str(e),
-                "html": html,  # Return original on error
-                "replay_url": self.session_replay_url
+                "html": html  # Return original on error
             }
 
     async def _execute_tool(self, tool_name: str, tool_input: Dict) -> Dict[str, Any]:
@@ -883,7 +803,7 @@ Make your best judgment based on this visual context.
                 return {"success": True, "message": "Finalized"}
 
             elif tool_name == "capture_screenshot":
-                # Capture a screenshot for visual verification
+                # Capture a screenshot for visual verification via local Playwright
                 selector = tool_input.get("selector", "")
                 reason = tool_input.get("reason", "visual check")
 
@@ -891,32 +811,29 @@ Make your best judgment based on this visual context.
                 if not selector and self.selected_element:
                     selector = self.selected_element.get("selector", "")
 
-                if self.use_browserbase and self.browserbase._page:
-                    try:
-                        # Update browser with current HTML state
-                        await self.browserbase.load_html(self.current_html)
-
-                        # Capture screenshot (element-specific if selector provided)
-                        screenshot = await self.browserbase.screenshot(selector=selector if selector else None)
-                        if screenshot:
-                            self.screenshots.append(screenshot)
-                            logger.info(f"EditingAgent: capture_screenshot SUCCESS - reason: {reason}, selector: {selector or 'full page'}")
-                            return {
-                                "success": True,
-                                "message": f"Screenshot captured for: {reason}",
-                                "screenshot_index": len(self.screenshots) - 1,
-                                "has_visual": True
-                            }
-                        else:
-                            return {"success": False, "error": "Failed to capture screenshot"}
-                    except Exception as e:
-                        logger.warning(f"EditingAgent: capture_screenshot failed: {e}")
-                        return {"success": False, "error": str(e)}
-                else:
-                    return {"success": False, "error": "Browserbase not available for screenshots"}
+                try:
+                    # Capture via local Playwright (fast, no cloud latency)
+                    screenshot = await self._capture_local_screenshot(
+                        self.current_html,
+                        selector=selector if selector else None
+                    )
+                    if screenshot:
+                        self.screenshots.append(screenshot)
+                        logger.info(f"EditingAgent: capture_screenshot SUCCESS - reason: {reason}, selector: {selector or 'full page'}")
+                        return {
+                            "success": True,
+                            "message": f"Screenshot captured for: {reason}",
+                            "screenshot_index": len(self.screenshots) - 1,
+                            "has_visual": True
+                        }
+                    else:
+                        return {"success": False, "error": "Failed to capture screenshot"}
+                except Exception as e:
+                    logger.warning(f"EditingAgent: capture_screenshot failed: {e}")
+                    return {"success": False, "error": str(e)}
 
             elif tool_name == "get_element_visual_info":
-                # Get computed styles and visual info about an element
+                # Get computed styles and visual info about an element via local Playwright
                 selector = tool_input.get("selector", "")
 
                 # Auto-inject selector from selected_element if not provided
@@ -926,61 +843,28 @@ Make your best judgment based on this visual context.
                 if not selector:
                     return {"success": False, "error": "No selector provided and no element selected"}
 
-                if self.use_browserbase and self.browserbase._page:
-                    try:
-                        # Update browser with current HTML state
-                        await self.browserbase.load_html(self.current_html)
+                try:
+                    # Get visual info via local Playwright service
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        response = await client.post(
+                            f"{self.playwright_url}/get-element-visual-info",
+                            json={
+                                "html": self.current_html,
+                                "selector": selector
+                            }
+                        )
 
-                        # Get computed styles and visual info
-                        visual_info = await self.browserbase._page.evaluate('''
-                            (selector) => {
-                                const el = document.querySelector(selector);
-                                if (!el) return null;
-
-                                const computed = window.getComputedStyle(el);
-                                const rect = el.getBoundingClientRect();
-
+                        if response.status_code == 200:
+                            data = response.json()
+                            if data.get("success"):
+                                logger.info(f"EditingAgent: get_element_visual_info SUCCESS - {selector}")
                                 return {
-                                    tag: el.tagName.toLowerCase(),
-                                    classes: Array.from(el.classList),
-                                    text: el.textContent?.substring(0, 100),
-                                    colors: {
-                                        backgroundColor: computed.backgroundColor,
-                                        color: computed.color,
-                                        borderColor: computed.borderColor
-                                    },
-                                    styles: {
-                                        fontSize: computed.fontSize,
-                                        fontWeight: computed.fontWeight,
-                                        fontFamily: computed.fontFamily,
-                                        padding: computed.padding,
-                                        margin: computed.margin,
-                                        borderRadius: computed.borderRadius
-                                    },
-                                    position: {
-                                        x: rect.x,
-                                        y: rect.y,
-                                        width: rect.width,
-                                        height: rect.height
-                                    }
-                                };
-                            }
-                        ''', selector)
+                                    "success": True,
+                                    "element": data.get("element"),
+                                    "message": f"Visual info for element: {selector}"
+                                }
 
-                        if visual_info:
-                            logger.info(f"EditingAgent: get_element_visual_info SUCCESS - {selector}")
-                            return {
-                                "success": True,
-                                "element": visual_info,
-                                "message": f"Visual info for element: {selector}"
-                            }
-                        else:
-                            return {"success": False, "error": f"Element not found: {selector}"}
-                    except Exception as e:
-                        logger.warning(f"EditingAgent: get_element_visual_info failed: {e}")
-                        return {"success": False, "error": str(e)}
-                else:
-                    # Fallback: return info from selected_element if available
+                    # Fallback to selected_element data
                     if self.selected_element:
                         return {
                             "success": True,
@@ -990,9 +874,24 @@ Make your best judgment based on this visual context.
                                 "color_classes": self.selected_element.get("color_classes", []),
                                 "text": self.selected_element.get("text", "")[:100]
                             },
-                            "message": "Visual info from selected element (Browserbase not available)"
+                            "message": "Visual info from selected element metadata"
                         }
-                    return {"success": False, "error": "Browserbase not available and no selected element"}
+                    return {"success": False, "error": f"Element not found: {selector}"}
+                except Exception as e:
+                    logger.warning(f"EditingAgent: get_element_visual_info failed: {e}")
+                    # Fallback to selected_element data
+                    if self.selected_element:
+                        return {
+                            "success": True,
+                            "element": {
+                                "tag": self.selected_element.get("tag"),
+                                "classes": self.selected_element.get("classes", []),
+                                "color_classes": self.selected_element.get("color_classes", []),
+                                "text": self.selected_element.get("text", "")[:100]
+                            },
+                            "message": "Visual info from selected element (fallback)"
+                        }
+                    return {"success": False, "error": str(e)}
 
             else:
                 return {"success": False, "error": f"Unknown tool: {tool_name}"}
@@ -1145,16 +1044,52 @@ Make your best judgment based on this visual context.
         Returns:
             Edit result dict
         """
-        # Try Browserbase first if available and connected
-        if self.use_browserbase and self.browserbase._page:
-            logger.info(f"EditingAgent: Trying Browserbase for {edit_type} on {selector}")
-            result = await self._edit_via_browserbase(selector, edit_type, edit_value)
-            if result.get("success"):
-                return result
-            logger.warning(f"EditingAgent: Browserbase failed, falling back to local Playwright")
-
-        # Fallback to local Playwright
+        # Use local Playwright for edits (fast, no cloud latency)
         return await self._edit_via_playwright(html, selector, edit_type, edit_value)
+
+    async def _capture_local_screenshot(
+        self,
+        html: str,
+        selector: Optional[str] = None
+    ) -> Optional[bytes]:
+        """
+        Capture screenshot via local Playwright service.
+
+        This provides visual context without Browserbase cloud latency.
+        Typical latency: ~300-500ms (vs ~2-3s with Browserbase)
+
+        Args:
+            html: HTML content to render
+            selector: Optional CSS selector for element screenshot
+
+        Returns:
+            Screenshot as bytes, or None if failed
+        """
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(
+                    f"{self.playwright_url}/screenshot",
+                    json={
+                        "html": html,
+                        "selector": selector,
+                        "full_page": False  # Viewport only for speed
+                    }
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("success") and data.get("screenshot"):
+                        # Decode base64 to bytes
+                        screenshot_bytes = base64.b64decode(data["screenshot"])
+                        logger.debug(f"Local screenshot captured: {len(screenshot_bytes)} bytes")
+                        return screenshot_bytes
+
+                logger.warning(f"Local screenshot failed: {response.status_code}")
+                return None
+
+        except Exception as e:
+            logger.warning(f"Local screenshot error: {e}")
+            return None
 
 
 # Singleton instance

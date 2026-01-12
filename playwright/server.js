@@ -555,6 +555,149 @@ app.post('/edit-component', async (req, res) => {
     }
 });
 
+// Get element visual info (computed styles, colors, position)
+app.post('/get-element-visual-info', async (req, res) => {
+    try {
+        const { html, selector } = req.body;
+
+        if (!html || !selector) {
+            return res.status(400).json({
+                error: 'Missing required fields: html, selector'
+            });
+        }
+
+        const browser = await chromium.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+
+        const context = await browser.newContext({
+            viewport: { width: 1280, height: 800 }
+        });
+        const page = await context.newPage();
+        await page.setContent(html, { waitUntil: 'domcontentloaded' });
+
+        const visualInfo = await page.evaluate((sel) => {
+            const el = document.querySelector(sel);
+            if (!el) return null;
+
+            const computed = window.getComputedStyle(el);
+            const rect = el.getBoundingClientRect();
+
+            return {
+                tag: el.tagName.toLowerCase(),
+                classes: Array.from(el.classList),
+                text: el.textContent?.substring(0, 100),
+                colors: {
+                    backgroundColor: computed.backgroundColor,
+                    color: computed.color,
+                    borderColor: computed.borderColor
+                },
+                styles: {
+                    fontSize: computed.fontSize,
+                    fontWeight: computed.fontWeight,
+                    fontFamily: computed.fontFamily,
+                    padding: computed.padding,
+                    margin: computed.margin,
+                    borderRadius: computed.borderRadius
+                },
+                position: {
+                    x: Math.round(rect.x),
+                    y: Math.round(rect.y),
+                    width: Math.round(rect.width),
+                    height: Math.round(rect.height)
+                }
+            };
+        }, selector);
+
+        await browser.close();
+
+        if (!visualInfo) {
+            return res.status(404).json({
+                success: false,
+                error: `Element not found: ${selector}`
+            });
+        }
+
+        res.json({
+            success: true,
+            element: visualInfo
+        });
+
+    } catch (error) {
+        console.error('Error getting element visual info:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Capture screenshot of HTML (for visual context)
+app.post('/screenshot', async (req, res) => {
+    try {
+        const { html, selector, full_page = true } = req.body;
+
+        if (!html) {
+            return res.status(400).json({
+                error: 'Missing required field: html'
+            });
+        }
+
+        const browser = await chromium.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+
+        const context = await browser.newContext({
+            viewport: { width: 1280, height: 800 }
+        });
+        const page = await context.newPage();
+        await page.setContent(html, { waitUntil: 'domcontentloaded' });
+
+        // Wait for fonts/images to load
+        await page.waitForTimeout(200);
+
+        let screenshotBuffer;
+        if (selector) {
+            const element = await page.$(selector);
+            if (element) {
+                screenshotBuffer = await element.screenshot({ type: 'png' });
+            } else {
+                await browser.close();
+                return res.status(404).json({
+                    success: false,
+                    error: `Element not found: ${selector}`
+                });
+            }
+        } else {
+            screenshotBuffer = await page.screenshot({
+                type: 'png',
+                fullPage: full_page
+            });
+        }
+
+        await browser.close();
+
+        // Return as base64
+        const base64 = screenshotBuffer.toString('base64');
+
+        res.json({
+            success: true,
+            screenshot: base64,
+            format: 'png',
+            encoding: 'base64'
+        });
+
+    } catch (error) {
+        console.error('Error capturing screenshot:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 // Get element HTML by selector
 app.post('/get-element', async (req, res) => {
     try {
