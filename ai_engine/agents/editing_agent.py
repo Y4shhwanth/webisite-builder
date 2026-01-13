@@ -1054,6 +1054,21 @@ Make your best judgment based on this visual context.
 
         return result
 
+    def _simplify_selector(self, selector: str) -> str:
+        """
+        Simplify a CSS selector by removing Tailwind arbitrary value classes.
+        e.g., 'h1.text-6xl.font-bold.leading-[0.9]' -> 'h1.text-6xl.font-bold'
+        """
+        import re
+        # Remove classes with brackets (Tailwind arbitrary values)
+        # Match .classname-[value] or .classname[value]
+        simplified = re.sub(r'\.[a-zA-Z0-9_-]+\[[^\]]+\]', '', selector)
+        # Also handle standalone [attr] selectors that might cause issues
+        simplified = re.sub(r'\[[^\]]*\]', '', simplified)
+        # Clean up any double dots or trailing dots
+        simplified = re.sub(r'\.+', '.', simplified).rstrip('.')
+        return simplified
+
     async def _edit_via_beautifulsoup(
         self,
         html: str,
@@ -1075,12 +1090,60 @@ Make your best judgment based on this visual context.
         """
         try:
             from bs4 import BeautifulSoup
+            import re
 
             soup = BeautifulSoup(html, 'html.parser')
-            element = soup.select_one(selector) if selector else None
+            element = None
+
+            # Try original selector first
+            try:
+                element = soup.select_one(selector) if selector else None
+            except Exception as selector_error:
+                logger.warning(f"EditingAgent: Original selector failed: {selector_error}")
+                # Try simplified selector (remove Tailwind arbitrary values)
+                simplified = self._simplify_selector(selector)
+                if simplified and simplified != selector:
+                    logger.info(f"EditingAgent: Trying simplified selector: {simplified}")
+                    try:
+                        element = soup.select_one(simplified)
+                    except Exception:
+                        pass
+
+                # If still no element, try just the tag name
+                if not element and selector:
+                    # Extract tag name from selector (e.g., "div.class > h1.class" -> "h1")
+                    tag_match = re.search(r'([a-zA-Z0-9]+)(?:\.|#|$|\s|>|:)', selector.split('>')[-1].strip())
+                    if tag_match:
+                        tag_name = tag_match.group(1)
+                        logger.info(f"EditingAgent: Trying tag-only selector: {tag_name}")
+                        elements = soup.find_all(tag_name)
+                        if elements:
+                            # If we have selected element text, try to match by content
+                            if self.selected_element and self.selected_element.get("text"):
+                                target_text = self.selected_element["text"].strip()[:50]
+                                for el in elements:
+                                    if target_text in el.get_text():
+                                        element = el
+                                        logger.info(f"EditingAgent: Found element by text content match")
+                                        break
+                            if not element:
+                                element = elements[0]  # Default to first match
 
             if not element:
-                logger.warning(f"EditingAgent: BeautifulSoup - selector '{selector}' not found")
+                # Last resort: try string replacement for text edits
+                if edit_type == "text" and self.selected_element:
+                    old_text = self.selected_element.get("text", "").strip()
+                    if old_text and old_text in html:
+                        modified_html = html.replace(old_text, edit_value, 1)
+                        if modified_html != html:
+                            logger.info(f"EditingAgent: Used direct string replacement for text edit")
+                            return {
+                                "success": True,
+                                "html": modified_html,
+                                "message": f"Successfully edited text via string replacement"
+                            }
+
+                logger.warning(f"EditingAgent: BeautifulSoup - could not find element for selector '{selector}'")
                 return {"success": False, "error": f"Element not found: {selector}"}
 
             if edit_type == "text":

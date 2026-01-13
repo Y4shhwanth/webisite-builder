@@ -1961,7 +1961,7 @@
                         <!-- Tabs -->
                         <div style="display: flex; gap: 0; margin-bottom: 24px; background: #e9ecef; border-radius: 8px; padding: 4px;">
                             <button class="welcome-tab-new active" onclick="switchWelcomeTabNew('generate')" style="padding: 10px 24px; border: none; background: #fff; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; color: #1a1a1a;">Generate New</button>
-                            <button class="welcome-tab-new" onclick="switchWelcomeTabNew('upload')" style="padding: 10px 24px; border: none; background: transparent; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; color: #666;">Upload HTML</button>
+                            <button class="welcome-tab-new" onclick="switchWelcomeTabNew('upload')" style="padding: 10px 24px; border: none; background: transparent; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; color: #666;">Import URL</button>
                             <button class="welcome-tab-new" onclick="switchWelcomeTabNew('paste')" style="padding: 10px 24px; border: none; background: transparent; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; color: #666;">Paste HTML</button>
                         </div>
 
@@ -1997,15 +1997,21 @@
                             <button class="btn btn-primary" onclick="generateWebsiteNew()" style="width: 100%; padding: 14px 24px; font-size: 15px; font-weight: 600;">Generate Website</button>
                         </div>
 
-                        <!-- Tab 2: Upload -->
+                        <!-- Tab 2: Import URL -->
                         <div id="uploadTabNew" class="tab-content-new" style="display: none; width: 100%; max-width: 600px;">
-                            <div style="border: 2px dashed #ddd; border-radius: 12px; padding: 48px; text-align: center; background: #fff;">
-                                <div style="font-size: 48px; margin-bottom: 16px;">📁</div>
-                                <div style="font-size: 16px; color: #1a1a1a; margin-bottom: 8px; font-weight: 500;">Drop your HTML file here</div>
-                                <div style="font-size: 13px; color: #888; margin-bottom: 20px;">or click to browse</div>
-                                <input type="file" id="htmlUploadNew" accept=".html,.htm" onchange="handleFileUploadNew(event)" style="display: none;">
-                                <button onclick="document.getElementById('htmlUploadNew').click()" style="padding: 12px 32px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer;">Choose File</button>
+                            <div style="margin-bottom: 16px;">
+                                <label style="display: block; font-size: 13px; color: #666; margin-bottom: 8px; font-weight: 500;">Website URL</label>
+                                <input type="url" id="websiteUrlInput" placeholder="https://example.com" style="width: 100%; padding: 14px 16px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none;">
                             </div>
+                            <div style="background: #f8f9fa; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                                <div style="font-size: 13px; color: #666; line-height: 1.6;">
+                                    <strong>How it works:</strong><br>
+                                    1. Paste any website URL<br>
+                                    2. We'll fetch the HTML content<br>
+                                    3. Edit it with AI assistance
+                                </div>
+                            </div>
+                            <button class="btn btn-primary" onclick="importFromUrl()" style="width: 100%; padding: 14px 24px; font-size: 15px; font-weight: 600;">Import & Edit</button>
                         </div>
 
                         <!-- Tab 3: Paste -->
@@ -4375,6 +4381,53 @@ Use find_and_replace or modify_class to make these structural fixes.`,
             updatePreviewFrameNew(currentHTML);
             try { if (typeof extractDesignContext === 'function') extractDesignContext(currentHTML); } catch(e) { console.warn('Design context skipped:', e); }
             addChatMessageNew('assistant', '✅ HTML loaded! Click on any element to select it, then tell me what to change.');
+        }
+
+        async function importFromUrl() {
+            const urlInput = document.getElementById('websiteUrlInput');
+            const url = urlInput.value.trim();
+
+            if (!url) {
+                showToast('Please enter a website URL', 'error');
+                return;
+            }
+
+            // Show loading state
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = 'Importing...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(`${AI_BASE}/api/build/fetch-url`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.html) {
+                    currentHTML = data.html;
+                    htmlHistory = [currentHTML];
+                    document.getElementById('welcomeScreenNew').style.display = 'none';
+                    updatePreviewFrameNew(currentHTML);
+                    try { if (typeof extractDesignContext === 'function') extractDesignContext(currentHTML); } catch(e) { console.warn('Design context skipped:', e); }
+
+                    // Extract domain for display
+                    const domain = new URL(data.url).hostname;
+                    addChatMessageNew('assistant', `✅ Imported ${domain}! Click on any element to select it, then tell me what to change.`);
+                    showToast('Website imported successfully!', 'success');
+                } else {
+                    showToast(data.error || 'Failed to import website', 'error');
+                }
+            } catch (error) {
+                console.error('Import error:', error);
+                showToast('Failed to import website. Check the URL and try again.', 'error');
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
         }
 
         function handleChatKeydownNew(event) {

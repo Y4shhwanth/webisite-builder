@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional, List
 import time
+import httpx
 
 from logging_config import logger
 from config import settings
@@ -208,6 +209,97 @@ async def extract_context_from_html(data: ExtractContextRequest):
     except Exception as e:
         logger.error(f"Error extracting design context: {str(e)}")
         return ExtractContextResponse(
+            success=False,
+            error=str(e)
+        )
+
+
+class FetchUrlRequest(BaseModel):
+    """Request model for fetching HTML from URL"""
+    url: str
+
+
+class FetchUrlResponse(BaseModel):
+    """Response model for URL fetch"""
+    success: bool
+    html: Optional[str] = None
+    error: Optional[str] = None
+    url: Optional[str] = None
+
+
+@router.post("/build/fetch-url", response_model=FetchUrlResponse)
+async def fetch_html_from_url(data: FetchUrlRequest):
+    """
+    Fetch HTML content from a given URL.
+
+    This endpoint acts as a proxy to bypass CORS restrictions.
+    It fetches the HTML from the provided URL and returns it.
+    """
+    try:
+        url = data.url.strip()
+
+        # Validate URL
+        if not url:
+            return FetchUrlResponse(
+                success=False,
+                error="URL is required"
+            )
+
+        # Add protocol if missing
+        if not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
+
+        logger.info(f"Fetching HTML from URL: {url}")
+
+        # Fetch the HTML
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            response = await client.get(
+                url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Language": "en-US,en;q=0.5",
+                }
+            )
+
+            if response.status_code != 200:
+                return FetchUrlResponse(
+                    success=False,
+                    error=f"Failed to fetch URL: HTTP {response.status_code}"
+                )
+
+            html = response.text
+
+            # Basic validation that it looks like HTML
+            if not html or '<' not in html:
+                return FetchUrlResponse(
+                    success=False,
+                    error="Response does not appear to be valid HTML"
+                )
+
+            logger.info(f"Successfully fetched HTML from {url}, size: {len(html)} bytes")
+
+            return FetchUrlResponse(
+                success=True,
+                html=html,
+                url=url
+            )
+
+    except httpx.TimeoutException:
+        logger.error(f"Timeout fetching URL: {data.url}")
+        return FetchUrlResponse(
+            success=False,
+            error="Request timed out. The website might be slow or unavailable."
+        )
+    except httpx.RequestError as e:
+        logger.error(f"Request error fetching URL: {str(e)}")
+        return FetchUrlResponse(
+            success=False,
+            error=f"Failed to connect: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Error fetching URL: {str(e)}")
+        return FetchUrlResponse(
             success=False,
             error=str(e)
         )
