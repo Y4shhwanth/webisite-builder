@@ -390,7 +390,8 @@ async def _edit_with_ai(
     html: str,
     instruction: str,
     design_context: Optional[Dict[str, Any]] = None,
-    selected_element: Optional[Dict[str, Any]] = None
+    selected_element: Optional[Dict[str, Any]] = None,
+    max_iterations: int = 15
 ) -> dict:
     """Edit HTML using Claude AI Agent (for complex edits with tool use)"""
     try:
@@ -399,7 +400,8 @@ async def _edit_with_ai(
             html=html,
             instruction=instruction,
             design_context=design_context,
-            selected_element=selected_element
+            selected_element=selected_element,
+            max_iterations=max_iterations
         )
 
         if result.get("success"):
@@ -428,7 +430,7 @@ class AgentEditRequest(BaseModel):
     """Request model for agent-based editing"""
     html: str
     instruction: str
-    max_iterations: Optional[int] = 5
+    max_iterations: Optional[int] = 15  # Increased for complex edits
     design_context: Optional[Dict[str, Any]] = None
     selected_element: Optional[SelectedElement] = None
 

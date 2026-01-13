@@ -1,5 +1,5 @@
 """
-Editing Agent using OpenRouter API for intelligent website editing.
+Editing Agent using Anthropic API for intelligent website editing.
 
 This agent can:
 - Understand the current HTML structure
@@ -14,6 +14,7 @@ from typing import List, Dict, Any, Optional
 import json
 import base64
 import httpx
+import anthropic
 from logging_config import logger
 from config import settings
 from services.editing_system_prompt import (
@@ -27,10 +28,8 @@ from services.visual_verification import get_visual_verification_service, Visual
 class EditingAgent:
     """
     Intelligent editing agent with tool use for website modifications.
-    Uses OpenRouter API for AI capabilities.
+    Uses Anthropic API for AI capabilities.
     """
-
-    OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
     SYSTEM_PROMPT = """You are an expert website editor agent. Your job is to make precise,
 high-quality edits to HTML websites based on user instructions.
@@ -247,6 +246,49 @@ Always return valid, complete HTML."""
         {
             "type": "function",
             "function": {
+                "name": "add_element",
+                "description": "Add a new HTML element to the page. Use this to add new sections, components, or elements.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "parent_selector": {
+                            "type": "string",
+                            "description": "CSS selector for the parent element to add to (e.g., 'main', 'body', 'section.hero')"
+                        },
+                        "html": {
+                            "type": "string",
+                            "description": "The HTML to add (can be a complete section or element)"
+                        },
+                        "position": {
+                            "type": "string",
+                            "enum": ["before_begin", "after_begin", "before_end", "after_end"],
+                            "description": "Where to insert: before_begin (before parent), after_begin (first child), before_end (last child), after_end (after parent)"
+                        }
+                    },
+                    "required": ["parent_selector", "html", "position"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "remove_element",
+                "description": "Remove an element from the page. Use this when user asks to delete or remove something.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "selector": {
+                            "type": "string",
+                            "description": "CSS selector for the element to remove"
+                        }
+                    },
+                    "required": ["selector"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "capture_screenshot",
                 "description": "Capture a screenshot of the current page state or a specific element. Use this to visually verify your changes or see the current state of the page. The screenshot will be shown to you.",
                 "parameters": {
@@ -281,18 +323,40 @@ Always return valid, complete HTML."""
                     "required": []
                 }
             }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "fetch_reference_url",
+                "description": "Fetch an external website URL to use as a design reference. This captures a screenshot and extracts design elements (colors, fonts, layout patterns) that you can then apply to the current page. Use this when the user says 'make it look like [URL]' or 'take reference from [URL]'.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {
+                            "type": "string",
+                            "description": "The full URL to fetch (e.g., 'https://example.com')"
+                        },
+                        "focus_area": {
+                            "type": "string",
+                            "description": "Optional: specific area to focus on (e.g., 'hero section', 'navigation', 'footer', 'color scheme', 'typography')"
+                        }
+                    },
+                    "required": ["url"]
+                }
+            }
         }
     ]
 
     def __init__(self, model: str = None):
         """Initialize the editing agent."""
+        # Use OpenRouter API with Claude Sonnet 4
         self.api_key = settings.OPENROUTER_API_KEY
-        self.model = model or "anthropic/claude-3.5-sonnet"
+        self.model = model or "anthropic/claude-sonnet-4"  # Claude Sonnet 4 via OpenRouter
         self.playwright_url = settings.PLAYWRIGHT_SERVICE_URL
         self.current_html = ""
         self.selected_element = None  # Store for auto-injection in tools
-        self.max_iterations = 5  # Allows for creative edits with multiple class changes
-        self.temperature = 0.2  # Slightly higher for creative judgment while staying consistent
+        self.max_iterations = 15  # Increased for complex multi-step edits
+        self.temperature = 0.3  # Higher for creative and complex edits
 
         # Browserbase integration (cloud browser)
         self.browserbase: BrowserbaseService = get_browserbase_service()
@@ -300,9 +364,45 @@ Always return valid, complete HTML."""
         self.use_browserbase = self.browserbase.is_available
         self.screenshots: List[bytes] = []  # Store screenshots for verification
         self.session_replay_url: Optional[str] = None
+        self.reference_screenshot: Optional[bytes] = None  # Store reference URL screenshot
 
         logger.info(f"Initialized EditingAgent with model: {self.model}")
         logger.info(f"Browserbase available: {self.use_browserbase}")
+
+    def _convert_tools_to_anthropic_format(self) -> List[Dict[str, Any]]:
+        """Convert OpenRouter tool format to Anthropic format."""
+        anthropic_tools = []
+        for tool in self.EDITING_TOOLS:
+            func = tool.get("function", {})
+            anthropic_tools.append({
+                "name": func.get("name"),
+                "description": func.get("description"),
+                "input_schema": func.get("parameters", {"type": "object", "properties": {}})
+            })
+        return anthropic_tools
+
+    def _convert_messages_to_anthropic_format(self, messages: List[Dict]) -> List[Dict]:
+        """Convert messages to Anthropic format, handling initial user message properly."""
+        anthropic_messages = []
+        for msg in messages:
+            role = msg.get("role")
+            content = msg.get("content")
+
+            if role == "user":
+                # Handle different content types
+                if isinstance(content, str):
+                    anthropic_messages.append({"role": "user", "content": content})
+                elif isinstance(content, list):
+                    # Already in block format
+                    anthropic_messages.append({"role": "user", "content": content})
+                else:
+                    anthropic_messages.append(msg)
+            elif role == "assistant":
+                anthropic_messages.append(msg)
+            else:
+                anthropic_messages.append(msg)
+
+        return anthropic_messages
 
     def _build_message_with_visual_context(
         self,
@@ -362,7 +462,7 @@ Make your best judgment based on this visual context.
         self,
         html: str,
         instruction: str,
-        max_iterations: int = 5,
+        max_iterations: int = 15,
         design_context: Optional[Dict[str, Any]] = None,
         selected_element: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
@@ -372,7 +472,7 @@ Make your best judgment based on this visual context.
         Args:
             html: Current HTML content
             instruction: User's edit instruction
-            max_iterations: Max tool use iterations
+            max_iterations: Max tool use iterations (default 15 for complex edits)
             design_context: Extracted design metadata (fonts, colors, sections)
             selected_element: Currently selected element info (selector, tag, classes)
 
@@ -388,8 +488,10 @@ Make your best judgment based on this visual context.
 
             self.current_html = html
             self.selected_element = selected_element  # Store for auto-injection in tools
+            self.current_instruction = instruction  # Store for safeguard checks
             self.screenshots = []  # Reset screenshots for this edit session
             self.session_replay_url = None
+            self.reference_screenshot = None  # Reset reference screenshot for this edit session
 
             # Capture initial screenshot via local Playwright (fast, no cloud latency)
             initial_screenshot = await self._capture_local_screenshot(html)
@@ -437,37 +539,45 @@ Make your best judgment based on this visual context.
                 logger.info(f"EditingAgent: Iteration {iteration}")
 
                 # Call OpenRouter API with tools
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    response = await client.post(
-                        self.OPENROUTER_API_URL,
-                        headers={
-                            "Authorization": f"Bearer {self.api_key}",
-                            "Content-Type": "application/json",
-                            "HTTP-Referer": "https://topmate.io",
-                            "X-Title": "AI Website Builder"
-                        },
-                        json={
-                            "model": self.model,
-                            "messages": [
-                                {"role": "system", "content": system_prompt},
-                                *messages
-                            ],
-                            "tools": self.EDITING_TOOLS,
-                            "max_tokens": 8192,
-                            "temperature": self.temperature
-                        }
-                    )
+                try:
+                    async with httpx.AsyncClient(timeout=120.0) as client:
+                        response = await client.post(
+                            "https://openrouter.ai/api/v1/chat/completions",
+                            headers={
+                                "Authorization": f"Bearer {self.api_key}",
+                                "Content-Type": "application/json",
+                                "HTTP-Referer": "https://topmate.io",
+                                "X-Title": "AI Website Builder"
+                            },
+                            json={
+                                "model": self.model,
+                                "messages": [
+                                    {"role": "system", "content": system_prompt},
+                                    *messages
+                                ],
+                                "tools": self.EDITING_TOOLS,
+                                "max_tokens": 4096,
+                                "temperature": self.temperature
+                            }
+                        )
 
-                    if response.status_code != 200:
-                        error_text = response.text
-                        logger.error(f"OpenRouter API error: {response.status_code} - {error_text}")
-                        return {
-                            "success": False,
-                            "error": f"API error: {response.status_code}",
-                            "html": html
-                        }
+                        if response.status_code != 200:
+                            error_text = response.text
+                            logger.error(f"OpenRouter API error: {response.status_code} - {error_text}")
+                            return {
+                                "success": False,
+                                "error": f"API error: {response.status_code}",
+                                "html": html
+                            }
 
-                    result = response.json()
+                        result = response.json()
+                except Exception as e:
+                    logger.error(f"OpenRouter API error: {e}")
+                    return {
+                        "success": False,
+                        "error": f"API error: {str(e)}",
+                        "html": html
+                    }
 
                 # Get the assistant's response
                 choice = result.get("choices", [{}])[0]
@@ -503,7 +613,6 @@ Make your best judgment based on this visual context.
                     # Check if finalize was called
                     if tool_name == "finalize_edit":
                         # Always use self.current_html - it has been modified by previous tools
-                        # The AI should NOT pass HTML, just a summary
                         edit_summary = tool_input.get("summary", "Edit completed")
                         final_html = self.current_html
 
@@ -522,15 +631,48 @@ Make your best judgment based on this visual context.
                     if tool_result.get("success") and tool_result.get("html"):
                         self.current_html = tool_result["html"]
 
+                    # For fetch_reference_url, include screenshot description in result
+                    tool_result_for_message = {k: v for k, v in tool_result.items() if k != "screenshot"}
+                    if tool_name == "fetch_reference_url" and tool_result.get("has_screenshot"):
+                        tool_result_for_message["visual_reference_available"] = True
+                        tool_result_for_message["instruction"] = (
+                            "Screenshot of reference URL captured. Use the design patterns, colors, "
+                            "and layout you see to style the current page similarly."
+                        )
+
                     tool_results.append({
                         "tool_call_id": tool_id,
                         "role": "tool",
-                        "content": json.dumps(tool_result)
+                        "content": json.dumps(tool_result_for_message)
                     })
 
-                # Add assistant response and tool results to messages
+                # Add assistant response and tool results to messages (OpenRouter format)
                 messages.append({"role": "assistant", "content": message.get("content"), "tool_calls": tool_calls})
                 messages.extend(tool_results)
+
+                # If we have a reference screenshot, add it as a user message with the image
+                if self.reference_screenshot and len(self.screenshots) > 0:
+                    try:
+                        ref_screenshot_b64 = base64.b64encode(self.reference_screenshot).decode('utf-8')
+                        messages.append({
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": "Here is the screenshot of the reference website. Use this as visual reference for your edits - match the colors, layout, and overall style."
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/png;base64,{ref_screenshot_b64}"
+                                    }
+                                }
+                            ]
+                        })
+                        # Only include once
+                        self.reference_screenshot = None
+                    except Exception as e:
+                        logger.warning(f"Failed to include reference screenshot: {e}")
 
             # If we exhausted iterations, return current state
             return {
@@ -606,11 +748,21 @@ Make your best judgment based on this visual context.
                 return result
 
             elif tool_name == "replace_element":
+                new_html = tool_input.get("new_html", "")
+
+                # SAFEGUARD: Block if new_html is empty or too small (likely trying to remove)
+                if not new_html or len(new_html.strip()) < 10:
+                    logger.warning(f"EditingAgent: replace_element BLOCKED - new_html is empty or too small")
+                    return {
+                        "success": False,
+                        "error": "BLOCKED: Cannot replace with empty content. Use modify_class to change appearance instead."
+                    }
+
                 result = await self._edit_with_fallback(
                     html=self.current_html,  # Always use current state
                     selector=get_selector(),
                     edit_type="replace",
-                    edit_value=tool_input.get("new_html")
+                    edit_value=new_html
                 )
                 # Update current_html if successful
                 if result.get("success") and result.get("html"):
@@ -626,10 +778,20 @@ Make your best judgment based on this visual context.
                 old_class = tool_input.get("old_class", "")
                 new_class = tool_input.get("new_class", "")
 
-                # AUTO-INJECT: If no selector provided but we have a selected_element, use it
-                if not selector and self.selected_element:
-                    selector = self.selected_element.get("selector", "")
-                    logger.info(f"EditingAgent: modify_class - AUTO-INJECTING selector from selected_element: '{selector}'")
+                # SMART SELECTOR OVERRIDE: If user selected an element, prioritize it
+                if self.selected_element:
+                    selected_selector = self.selected_element.get("selector", "")
+                    selected_classes = self.selected_element.get("classes", [])
+
+                    # If AI is trying to edit body/html but user selected something specific, override
+                    if selector in ["body", "html", "main", ""] or not selector:
+                        selector = selected_selector
+                        logger.info(f"EditingAgent: modify_class - OVERRIDING to selected element: '{selector}'")
+
+                    # If old_class is in the selected element's classes, use selected element
+                    elif old_class and selected_classes and old_class in " ".join(selected_classes):
+                        selector = selected_selector
+                        logger.info(f"EditingAgent: modify_class - old_class found in selected element, using: '{selector}'")
 
                 # Get outer_html for precise targeting (most reliable method)
                 outer_html = self.selected_element.get("outer_html", "") if self.selected_element else ""
@@ -802,6 +964,102 @@ Make your best judgment based on this visual context.
                 # This is handled in the main loop
                 return {"success": True, "message": "Finalized"}
 
+            elif tool_name == "add_element":
+                # Add new HTML element to the page
+                parent_selector = tool_input.get("parent_selector", "")
+                new_html = tool_input.get("html", "")
+                position = tool_input.get("position", "before_end")
+
+                if not parent_selector or not new_html:
+                    return {"success": False, "error": "parent_selector and html are required"}
+
+                logger.info(f"EditingAgent: add_element - parent='{parent_selector}', position='{position}'")
+
+                try:
+                    from bs4 import BeautifulSoup
+                    soup = BeautifulSoup(self.current_html, 'html.parser')
+                    parent = soup.select_one(parent_selector)
+
+                    if not parent:
+                        return {"success": False, "error": f"Parent element not found: {parent_selector}"}
+
+                    new_element = BeautifulSoup(new_html, 'html.parser')
+
+                    if position == "before_begin":
+                        parent.insert_before(new_element)
+                    elif position == "after_begin":
+                        parent.insert(0, new_element)
+                    elif position == "before_end":
+                        parent.append(new_element)
+                    elif position == "after_end":
+                        parent.insert_after(new_element)
+                    else:
+                        parent.append(new_element)  # Default to before_end
+
+                    modified_html = str(soup)
+                    self.current_html = modified_html
+                    logger.info(f"EditingAgent: add_element SUCCESS - added to {parent_selector}")
+                    return {
+                        "success": True,
+                        "html": modified_html,
+                        "message": f"Added element to {parent_selector} at position {position}"
+                    }
+                except Exception as e:
+                    logger.error(f"EditingAgent: add_element error: {e}")
+                    return {"success": False, "error": str(e)}
+
+            elif tool_name == "remove_element":
+                # Remove element from the page - BUT ONLY IF USER EXPLICITLY ASKED
+                selector = tool_input.get("selector", "")
+
+                # SAFEGUARD: Check if user actually asked for removal
+                # This prevents AI from removing elements without explicit permission
+                removal_keywords = ["remove", "delete", "hide", "get rid of", "take out", "eliminate"]
+                instruction_lower = self.current_instruction.lower() if hasattr(self, 'current_instruction') else ""
+
+                user_asked_for_removal = any(keyword in instruction_lower for keyword in removal_keywords)
+
+                if not user_asked_for_removal:
+                    logger.warning(f"EditingAgent: remove_element BLOCKED - user did not ask for removal")
+                    return {
+                        "success": False,
+                        "error": "BLOCKED: Cannot remove elements unless user explicitly asks. Use modify_class or edit_style to change appearance instead."
+                    }
+
+                # Auto-inject selector from selected_element if not provided
+                if not selector and self.selected_element:
+                    selector = self.selected_element.get("selector", "")
+
+                if not selector:
+                    return {"success": False, "error": "selector is required"}
+
+                logger.info(f"EditingAgent: remove_element - selector='{selector}'")
+
+                try:
+                    from bs4 import BeautifulSoup
+                    soup = BeautifulSoup(self.current_html, 'html.parser')
+                    elements = soup.select(selector)
+
+                    if not elements:
+                        return {"success": False, "error": f"Element not found: {selector}"}
+
+                    removed_count = 0
+                    for element in elements:
+                        element.decompose()
+                        removed_count += 1
+
+                    modified_html = str(soup)
+                    self.current_html = modified_html
+                    logger.info(f"EditingAgent: remove_element SUCCESS - removed {removed_count} element(s)")
+                    return {
+                        "success": True,
+                        "html": modified_html,
+                        "message": f"Removed {removed_count} element(s) matching {selector}"
+                    }
+                except Exception as e:
+                    logger.error(f"EditingAgent: remove_element error: {e}")
+                    return {"success": False, "error": str(e)}
+
             elif tool_name == "capture_screenshot":
                 # Capture a screenshot for visual verification via local Playwright
                 selector = tool_input.get("selector", "")
@@ -891,6 +1149,34 @@ Make your best judgment based on this visual context.
                             },
                             "message": "Visual info from selected element (fallback)"
                         }
+                    return {"success": False, "error": str(e)}
+
+            elif tool_name == "fetch_reference_url":
+                # Fetch external URL and extract design reference
+                url = tool_input.get("url", "")
+                focus_area = tool_input.get("focus_area", "")
+
+                if not url:
+                    return {"success": False, "error": "URL is required"}
+
+                # Ensure URL has protocol
+                if not url.startswith(('http://', 'https://')):
+                    url = 'https://' + url
+
+                logger.info(f"EditingAgent: fetch_reference_url - fetching {url}, focus: {focus_area or 'full page'}")
+
+                try:
+                    result = await self._fetch_reference_url(url, focus_area)
+                    if result.get("success"):
+                        # Store the reference screenshot for the AI to see
+                        if result.get("screenshot"):
+                            self.reference_screenshot = result["screenshot"]
+                            self.screenshots.append(result["screenshot"])
+                        return result
+                    else:
+                        return {"success": False, "error": result.get("error", "Failed to fetch URL")}
+                except Exception as e:
+                    logger.error(f"EditingAgent: fetch_reference_url error: {e}")
                     return {"success": False, "error": str(e)}
 
             else:
@@ -1234,6 +1520,153 @@ Make your best judgment based on this visual context.
             logger.warning(f"Local screenshot error: {e}")
             return None
 
+    async def _fetch_reference_url(
+        self,
+        url: str,
+        focus_area: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Fetch an external URL and extract design reference information.
+
+        Uses the Playwright service to:
+        1. Navigate to the URL
+        2. Capture a screenshot
+        3. Extract design elements (colors, fonts, layout)
+
+        Args:
+            url: The URL to fetch
+            focus_area: Optional area to focus on (e.g., 'hero', 'navigation')
+
+        Returns:
+            Dict with screenshot, design info, and extracted patterns
+        """
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                # Call the Playwright service to fetch the external URL
+                response = await client.post(
+                    f"{self.playwright_url}/fetch-url",
+                    json={
+                        "url": url,
+                        "capture_screenshot": True,
+                        "extract_design": True,
+                        "focus_area": focus_area
+                    }
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("success"):
+                        result = {
+                            "success": True,
+                            "url": url,
+                            "message": f"Successfully fetched {url}",
+                            "design_info": data.get("design_info", {}),
+                            "has_screenshot": bool(data.get("screenshot"))
+                        }
+
+                        # Decode screenshot if present
+                        if data.get("screenshot"):
+                            result["screenshot"] = base64.b64decode(data["screenshot"])
+                            result["screenshot_description"] = (
+                                f"Screenshot captured of {url}. "
+                                f"Focus area: {focus_area or 'full page'}. "
+                                "Use this visual reference to understand the design patterns."
+                            )
+
+                        # Include extracted design elements
+                        design_info = data.get("design_info", {})
+                        if design_info:
+                            result["extracted_patterns"] = {
+                                "colors": design_info.get("colors", []),
+                                "fonts": design_info.get("fonts", []),
+                                "layout": design_info.get("layout", ""),
+                                "style_notes": design_info.get("style_notes", "")
+                            }
+
+                        logger.info(f"EditingAgent: fetch_reference_url SUCCESS - {url}")
+                        return result
+                    else:
+                        return {"success": False, "error": data.get("error", "Failed to fetch URL")}
+                else:
+                    # Try fallback: fetch HTML directly without screenshot
+                    return await self._fetch_reference_url_fallback(url)
+
+        except Exception as e:
+            logger.warning(f"EditingAgent: fetch_reference_url error: {e}, trying fallback")
+            return await self._fetch_reference_url_fallback(url)
+
+    async def _fetch_reference_url_fallback(self, url: str) -> Dict[str, Any]:
+        """
+        Fallback method to fetch URL design info without Playwright.
+        Uses direct HTTP fetch and extracts design patterns from HTML/CSS.
+        """
+        try:
+            async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+                response = await client.get(
+                    url,
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+                    }
+                )
+
+                if response.status_code == 200:
+                    html = response.text
+
+                    # Extract basic design info from HTML
+                    from bs4 import BeautifulSoup
+                    soup = BeautifulSoup(html, 'html.parser')
+
+                    # Extract colors from inline styles and classes
+                    colors = set()
+                    fonts = set()
+
+                    # Find color patterns in style tags
+                    for style in soup.find_all('style'):
+                        style_text = style.string or ""
+                        # Extract hex colors
+                        import re
+                        hex_colors = re.findall(r'#[0-9a-fA-F]{3,6}', style_text)
+                        colors.update(hex_colors[:10])  # Limit to 10
+                        # Extract font families
+                        font_matches = re.findall(r'font-family:\s*([^;]+)', style_text)
+                        for fm in font_matches[:5]:
+                            fonts.add(fm.strip().strip('"\''))
+
+                    # Extract from inline styles
+                    for elem in soup.find_all(style=True)[:50]:
+                        style_attr = elem.get('style', '')
+                        hex_colors = re.findall(r'#[0-9a-fA-F]{3,6}', style_attr)
+                        colors.update(hex_colors)
+
+                    # Extract Tailwind color classes
+                    tailwind_colors = set()
+                    for elem in soup.find_all(class_=True)[:100]:
+                        classes = elem.get('class', [])
+                        if isinstance(classes, str):
+                            classes = classes.split()
+                        for cls in classes:
+                            if any(c in cls for c in ['bg-', 'text-', 'border-']) and any(c in cls for c in ['blue', 'red', 'green', 'purple', 'pink', 'yellow', 'gray', 'slate', 'zinc']):
+                                tailwind_colors.add(cls)
+
+                    return {
+                        "success": True,
+                        "url": url,
+                        "message": f"Fetched {url} (text only, no screenshot available)",
+                        "design_info": {
+                            "colors": list(colors)[:10],
+                            "tailwind_colors": list(tailwind_colors)[:20],
+                            "fonts": list(fonts)[:5],
+                            "note": "Screenshot not available. Design info extracted from HTML/CSS."
+                        },
+                        "has_screenshot": False
+                    }
+                else:
+                    return {"success": False, "error": f"HTTP {response.status_code}"}
+
+        except Exception as e:
+            logger.error(f"EditingAgent: fetch_reference_url_fallback error: {e}")
+            return {"success": False, "error": str(e)}
+
 
 # Singleton instance
 editing_agent = EditingAgent()
@@ -1243,7 +1676,8 @@ async def edit_with_agent(
     html: str,
     instruction: str,
     design_context: Optional[Dict[str, Any]] = None,
-    selected_element: Optional[Dict[str, Any]] = None
+    selected_element: Optional[Dict[str, Any]] = None,
+    max_iterations: int = 15
 ) -> Dict[str, Any]:
     """
     Convenience function to edit HTML using the editing agent.
@@ -1253,6 +1687,7 @@ async def edit_with_agent(
         instruction: Edit instruction
         design_context: Extracted design metadata (fonts, colors, sections)
         selected_element: Currently selected element info
+        max_iterations: Maximum number of tool use iterations
 
     Returns:
         Edited HTML and metadata
@@ -1260,6 +1695,7 @@ async def edit_with_agent(
     return await editing_agent.edit(
         html=html,
         instruction=instruction,
+        max_iterations=max_iterations,
         design_context=design_context,
         selected_element=selected_element
     )

@@ -754,6 +754,169 @@ app.post('/get-element', async (req, res) => {
     }
 });
 
+// Fetch external URL and extract design info (for reference-based editing)
+app.post('/fetch-url', async (req, res) => {
+    try {
+        const { url, capture_screenshot = true, extract_design = true, focus_area } = req.body;
+
+        if (!url) {
+            return res.status(400).json({
+                error: 'Missing required field: url'
+            });
+        }
+
+        console.log(`Fetching reference URL: ${url}, focus: ${focus_area || 'full page'}`);
+
+        const browser = await chromium.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+
+        const context = await browser.newContext({
+            viewport: { width: 1280, height: 800 },
+            userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        });
+        const page = await context.newPage();
+
+        // Navigate to URL with timeout
+        try {
+            await page.goto(url, {
+                waitUntil: 'domcontentloaded',
+                timeout: 15000
+            });
+            // Wait for content to render
+            await page.waitForTimeout(1000);
+        } catch (navError) {
+            await browser.close();
+            return res.status(400).json({
+                success: false,
+                error: `Failed to load URL: ${navError.message}`
+            });
+        }
+
+        const result = {
+            success: true,
+            url: url,
+            focus_area: focus_area || 'full page'
+        };
+
+        // Capture screenshot if requested
+        if (capture_screenshot) {
+            try {
+                const screenshotBuffer = await page.screenshot({
+                    type: 'png',
+                    fullPage: false  // Viewport only for speed
+                });
+                result.screenshot = screenshotBuffer.toString('base64');
+            } catch (ssError) {
+                console.warn('Screenshot capture failed:', ssError.message);
+            }
+        }
+
+        // Extract design info if requested
+        if (extract_design) {
+            const designInfo = await page.evaluate((focusArea) => {
+                const colors = new Set();
+                const fonts = new Set();
+                const tailwindColors = new Set();
+
+                // Extract from computed styles
+                const elements = document.querySelectorAll('*');
+                const sampleSize = Math.min(elements.length, 200);
+
+                for (let i = 0; i < sampleSize; i++) {
+                    const el = elements[i];
+                    const computed = window.getComputedStyle(el);
+
+                    // Extract colors
+                    const bgColor = computed.backgroundColor;
+                    const textColor = computed.color;
+                    if (bgColor && bgColor !== 'rgba(0, 0, 0, 0)') {
+                        colors.add(bgColor);
+                    }
+                    if (textColor) {
+                        colors.add(textColor);
+                    }
+
+                    // Extract fonts
+                    const fontFamily = computed.fontFamily;
+                    if (fontFamily) {
+                        fonts.add(fontFamily.split(',')[0].trim().replace(/["']/g, ''));
+                    }
+
+                    // Extract Tailwind classes
+                    const classes = Array.from(el.classList);
+                    for (const cls of classes) {
+                        if (/^(bg|text|border)-([\w]+)-([\d]+)$/.test(cls)) {
+                            tailwindColors.add(cls);
+                        }
+                    }
+                }
+
+                // Extract from style tags
+                const styleSheets = document.querySelectorAll('style');
+                for (const style of styleSheets) {
+                    const text = style.textContent || '';
+                    // Extract hex colors
+                    const hexMatches = text.match(/#[0-9a-fA-F]{3,6}/g) || [];
+                    hexMatches.slice(0, 20).forEach(c => colors.add(c));
+                }
+
+                // Determine layout patterns
+                const heroSection = document.querySelector('[class*="hero"], .hero, header, [class*="banner"]');
+                const hasGrid = document.querySelector('[class*="grid"]') !== null;
+                const hasFlex = document.querySelector('[class*="flex"]') !== null;
+
+                let layout = '';
+                if (heroSection) layout += 'Has hero section. ';
+                if (hasGrid) layout += 'Uses grid layout. ';
+                if (hasFlex) layout += 'Uses flexbox. ';
+
+                // Focus area specific extraction
+                let focusInfo = '';
+                if (focusArea) {
+                    const focusLower = focusArea.toLowerCase();
+                    if (focusLower.includes('hero') || focusLower.includes('header')) {
+                        const hero = document.querySelector('[class*="hero"], .hero, header');
+                        if (hero) {
+                            const heroComputed = window.getComputedStyle(hero);
+                            focusInfo = `Hero: bg=${heroComputed.backgroundColor}, `;
+                            focusInfo += `padding=${heroComputed.padding}`;
+                        }
+                    }
+                    if (focusLower.includes('color')) {
+                        focusInfo = `Primary colors extracted: ${Array.from(colors).slice(0, 5).join(', ')}`;
+                    }
+                }
+
+                return {
+                    colors: Array.from(colors).slice(0, 15),
+                    fonts: Array.from(fonts).slice(0, 5),
+                    tailwind_colors: Array.from(tailwindColors).slice(0, 20),
+                    layout: layout,
+                    focus_info: focusInfo,
+                    style_notes: `Page uses ${fonts.size} fonts and approximately ${colors.size} distinct colors.`
+                };
+            }, focus_area);
+
+            result.design_info = designInfo;
+        }
+
+        await browser.close();
+
+        console.log(`Successfully fetched reference URL: ${url}`);
+
+        res.json(result);
+
+    } catch (error) {
+        console.error('Error fetching reference URL:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 // Start server
 async function start() {
     await initRedis();
