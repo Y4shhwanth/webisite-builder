@@ -3940,11 +3940,11 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                 return;
             }
 
-            const blob = new Blob([currentHTML], { type: 'text/html' });
+            const blob = new Blob([currentHTML], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${currentUsername || 'website'}_portfolio.html`;
+            a.download = `${currentUsername || 'website'}_portfolio.txt`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
