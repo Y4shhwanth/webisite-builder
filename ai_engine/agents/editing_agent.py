@@ -1033,7 +1033,7 @@ Make your best judgment based on this visual context.
         edit_value: Any
     ) -> Dict[str, Any]:
         """
-        Execute edit with Browserbase first, fallback to local Playwright.
+        Execute edit with Playwright first, fallback to BeautifulSoup.
 
         Args:
             html: Current HTML
@@ -1044,8 +1044,88 @@ Make your best judgment based on this visual context.
         Returns:
             Edit result dict
         """
-        # Use local Playwright for edits (fast, no cloud latency)
-        return await self._edit_via_playwright(html, selector, edit_type, edit_value)
+        # Try Playwright first
+        result = await self._edit_via_playwright(html, selector, edit_type, edit_value)
+
+        # If Playwright failed, use BeautifulSoup fallback
+        if not result.get("success"):
+            logger.info(f"EditingAgent: Playwright failed, using BeautifulSoup fallback for {edit_type}")
+            result = await self._edit_via_beautifulsoup(html, selector, edit_type, edit_value)
+
+        return result
+
+    async def _edit_via_beautifulsoup(
+        self,
+        html: str,
+        selector: str,
+        edit_type: str,
+        edit_value: Any
+    ) -> Dict[str, Any]:
+        """
+        Execute edit via BeautifulSoup (fallback when Playwright is unavailable).
+
+        Args:
+            html: Current HTML
+            selector: CSS selector
+            edit_type: Type of edit (text, style, attribute, replace)
+            edit_value: Value to apply
+
+        Returns:
+            Edit result dict
+        """
+        try:
+            from bs4 import BeautifulSoup
+
+            soup = BeautifulSoup(html, 'html.parser')
+            element = soup.select_one(selector) if selector else None
+
+            if not element:
+                logger.warning(f"EditingAgent: BeautifulSoup - selector '{selector}' not found")
+                return {"success": False, "error": f"Element not found: {selector}"}
+
+            if edit_type == "text":
+                # Replace text content
+                element.string = edit_value
+                logger.info(f"EditingAgent: BeautifulSoup - changed text to '{edit_value[:50]}...'")
+
+            elif edit_type == "style":
+                # Add/update inline styles
+                existing_style = element.get("style", "")
+                if isinstance(edit_value, dict):
+                    style_str = "; ".join(f"{k}: {v}" for k, v in edit_value.items())
+                else:
+                    style_str = str(edit_value)
+                element["style"] = f"{existing_style}; {style_str}".strip("; ")
+                logger.info(f"EditingAgent: BeautifulSoup - updated styles")
+
+            elif edit_type == "attribute":
+                # Set attribute
+                if isinstance(edit_value, dict):
+                    attr_name = edit_value.get("name")
+                    attr_val = edit_value.get("value", "")
+                    if attr_name:
+                        element[attr_name] = attr_val
+                        logger.info(f"EditingAgent: BeautifulSoup - set {attr_name}='{attr_val}'")
+
+            elif edit_type == "replace":
+                # Replace entire element HTML
+                new_element = BeautifulSoup(edit_value, 'html.parser')
+                element.replace_with(new_element)
+                logger.info(f"EditingAgent: BeautifulSoup - replaced element")
+
+            else:
+                return {"success": False, "error": f"Unknown edit type: {edit_type}"}
+
+            modified_html = str(soup)
+            return {
+                "success": True,
+                "html": modified_html,
+                "message": f"Successfully edited {selector} via BeautifulSoup"
+            }
+
+        except Exception as e:
+            logger.error(f"EditingAgent: BeautifulSoup edit error: {e}")
+            return {"success": False, "error": str(e)}
 
     async def _capture_local_screenshot(
         self,
