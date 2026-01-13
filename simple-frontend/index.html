@@ -706,7 +706,7 @@
         }
 
         .template-card.selected::after {
-            content: '✓';
+            content: '';
             position: absolute;
             top: 8px;
             right: 8px;
@@ -1901,7 +1901,7 @@
         <div class="preview-panel">
             <div class="preview-header">
                 <div class="preview-url-bar">
-                    <span>🌐</span>
+                    <span></span>
                     <span id="previewUrl">your-website.topmate.io</span>
                 </div>
 
@@ -1977,17 +1977,17 @@
                                 <label style="display: block; font-size: 13px; color: #666; margin-bottom: 12px; font-weight: 500;">Choose a Template Style</label>
                                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
                                     <div class="template-card-new selected" data-template="modern-minimal" onclick="selectTemplateNew(this)" style="padding: 16px; border: 2px solid #667eea; border-radius: 10px; cursor: pointer; text-align: center; background: #f8f9ff;">
-                                        <div style="font-size: 24px; margin-bottom: 8px;">◻️</div>
+                                        <div style="font-size: 24px; margin-bottom: 8px;"></div>
                                         <div style="font-size: 13px; font-weight: 600; color: #1a1a1a;">Modern Minimal</div>
                                         <div style="font-size: 11px; color: #888; margin-top: 4px;">Clean & focused</div>
                                     </div>
                                     <div class="template-card-new" data-template="bold-creative" onclick="selectTemplateNew(this)" style="padding: 16px; border: 2px solid #e5e7eb; border-radius: 10px; cursor: pointer; text-align: center; background: #fff;">
-                                        <div style="font-size: 24px; margin-bottom: 8px;">🎨</div>
+                                        <div style="font-size: 24px; margin-bottom: 8px;"></div>
                                         <div style="font-size: 13px; font-weight: 600; color: #1a1a1a;">Bold & Creative</div>
                                         <div style="font-size: 11px; color: #888; margin-top: 4px;">Vibrant colors</div>
                                     </div>
                                     <div class="template-card-new" data-template="professional" onclick="selectTemplateNew(this)" style="padding: 16px; border: 2px solid #e5e7eb; border-radius: 10px; cursor: pointer; text-align: center; background: #fff;">
-                                        <div style="font-size: 24px; margin-bottom: 8px;">💼</div>
+                                        <div style="font-size: 24px; margin-bottom: 8px;"></div>
                                         <div style="font-size: 13px; font-weight: 600; color: #1a1a1a;">Professional</div>
                                         <div style="font-size: 11px; color: #888; margin-top: 4px;">Business focused</div>
                                     </div>
@@ -2071,27 +2071,27 @@
                                     <div class="template-section-title">Choose a Template Style</div>
                                     <div class="template-grid">
                                         <div class="template-card selected" data-template="modern-minimal" onclick="selectTemplate(this)">
-                                            <div class="template-icon minimal">◻️</div>
+                                            <div class="template-icon minimal"></div>
                                             <div class="template-name">Modern Minimal</div>
                                             <div class="template-desc">Clean design with focus on content</div>
                                         </div>
                                         <div class="template-card" data-template="bold-creative" onclick="selectTemplate(this)">
-                                            <div class="template-icon bold">🎨</div>
+                                            <div class="template-icon bold"></div>
                                             <div class="template-name">Bold & Creative</div>
                                             <div class="template-desc">Vibrant colors, dynamic layouts</div>
                                         </div>
                                         <div class="template-card" data-template="professional-corporate" onclick="selectTemplate(this)">
-                                            <div class="template-icon corporate">💼</div>
+                                            <div class="template-icon corporate"></div>
                                             <div class="template-name">Professional</div>
                                             <div class="template-desc">Trust-building business design</div>
                                         </div>
                                         <div class="template-card" data-template="dark-elegant" onclick="selectTemplate(this)">
-                                            <div class="template-icon dark">🌙</div>
+                                            <div class="template-icon dark"></div>
                                             <div class="template-name">Dark & Elegant</div>
                                             <div class="template-desc">Sophisticated dark theme</div>
                                         </div>
                                         <div class="template-card" data-template="vibrant-gradient" onclick="selectTemplate(this)">
-                                            <div class="template-icon gradient">✨</div>
+                                            <div class="template-icon gradient"></div>
                                             <div class="template-name">Vibrant Gradient</div>
                                             <div class="template-desc">Eye-catching glass effects</div>
                                         </div>
@@ -2113,11 +2113,11 @@
                                 <div class="upload-section">
                                     <div class="upload-methods">
                                         <div class="upload-method-btn active" onclick="switchUploadMethod('paste')">
-                                            <div class="icon">📋</div>
+                                            <div class="icon"></div>
                                             <div class="label">Paste HTML</div>
                                         </div>
                                         <div class="upload-method-btn" onclick="switchUploadMethod('file')">
-                                            <div class="icon">📁</div>
+                                            <div class="icon"></div>
                                             <div class="label">Upload File</div>
                                         </div>
                                     </div>
@@ -2141,7 +2141,7 @@
                                     <div id="fileSection" style="display: none;">
                                         <div class="file-upload-wrapper">
                                             <label class="file-input-label" id="fileInputLabel">
-                                                <span>📄 Drop HTML file here or click to browse</span>
+                                                <span>Drop HTML file here or click to browse</span>
                                                 <input type="file" class="file-input" id="htmlFileInput" accept=".html,.htm" onchange="handleFileUpload(event)">
                                             </label>
                                             <div class="file-name" id="fileName" style="display: none;"></div>
@@ -2437,7 +2437,7 @@
             reader.onload = function(e) {
                 uploadedFileContent = e.target.result;
                 document.getElementById('fileInputLabel').classList.add('has-file');
-                document.getElementById('fileName').textContent = `✓ ${file.name}`;
+                document.getElementById('fileName').textContent = file.name;
                 document.getElementById('fileName').style.display = 'block';
                 showToast('File loaded successfully!', 'success');
             };
@@ -3019,7 +3019,7 @@
             }
 
             // Show helper message
-            addChatMessage('assistant', `📷 **Image selected!** Enter the new image URL after "Replace this image with:" and press Enter.\n\nCurrent image: \`${currentUrl.substring(0, 50)}...\``);
+            addChatMessage('assistant', `Image selected. Enter the new image URL after "Replace this image with:" and press Enter.\n\nCurrent image: \`${currentUrl.substring(0, 50)}...\``);
         }
 
         function openImageUrlEdit() {
@@ -3643,7 +3643,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
             if (hasWebsite) {
                 console.log('>>> DIRECT EDIT MODE - sending to /api/edit/optimized');
                 // Direct edit - bypass chatbot and call edit API
-                const typingId = addChatMessage('assistant', '🔄 Applying edit...', false);
+                const typingId = addChatMessage('assistant', 'Applying edit...', false);
 
                 try {
                     document.getElementById('previewFrame').style.opacity = '0.5';
@@ -3670,15 +3670,15 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                         currentHTML = data.html;
                         updatePreviewFrame(currentHTML);
                         await syncHTML();
-                        updateChatMessage(typingId, `✅ Done! ${data.summary || 'Edit applied successfully.'}`);
+                        updateChatMessage(typingId, `Done! ${data.summary || 'Edit applied successfully.'}`);
                         showToast('Edit applied!', 'success');
                     } else {
-                        updateChatMessage(typingId, `❌ Edit failed: ${data.error || 'Unknown error'}`);
+                        updateChatMessage(typingId, `Edit failed: ${data.error || 'Unknown error'}`);
                         showToast('Edit failed', 'error');
                     }
                 } catch (error) {
                     document.getElementById('previewFrame').style.opacity = '1';
-                    updateChatMessage(typingId, `❌ Error: ${error.message}`);
+                    updateChatMessage(typingId, `Error: ${error.message}`);
                     showToast('Edit failed', 'error');
                 }
                 return;
@@ -3856,7 +3856,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                 console.log('Type match:', action.type === 'EDIT_WEBSITE');
 
                 if (action.type === 'EDIT_WEBSITE' && currentHTML) {
-                    showToast('🔄 Applying edit: ' + action.data.substring(0, 50) + '...', '');
+                    showToast('Applying edit: ' + action.data.substring(0, 50) + '...', '');
                     // Add visual loading indicator
                     document.getElementById('previewFrame').style.opacity = '0.5';
 
@@ -3908,16 +3908,16 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                             if (frame) frame.style.opacity = '1';
 
                             await syncHTML();
-                            showToast(htmlChanged ? '✅ Edit applied!' : '⚠️ No changes made', htmlChanged ? 'success' : '');
+                            showToast(htmlChanged ? 'Edit applied!' : 'No changes made', htmlChanged ? 'success' : '');
                         } else {
                             console.log('No HTML in response, data:', JSON.stringify(data).substring(0, 500));
                             document.getElementById('previewFrame').style.opacity = '1';
-                            showToast('❌ Edit returned no HTML', 'error');
+                            showToast('Edit returned no HTML', 'error');
                         }
                     } catch (error) {
                         console.error('Edit error:', error);
                         document.getElementById('previewFrame').style.opacity = '1';
-                        showToast('❌ Edit failed: ' + error.message, 'error');
+                        showToast('Edit failed: ' + error.message, 'error');
                     }
                 }
             }
@@ -4371,7 +4371,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
         function loadPastedHtmlNew() {
             const html = document.getElementById('pasteHtmlNew').value.trim();
             if (!html) {
-                addChatMessageNew('assistant', '⚠️ Please paste some HTML code first');
+                addChatMessageNew('assistant', 'Please paste some HTML code first');
                 return;
             }
 
@@ -4380,7 +4380,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
             document.getElementById('welcomeScreenNew').style.display = 'none';
             updatePreviewFrameNew(currentHTML);
             try { if (typeof extractDesignContext === 'function') extractDesignContext(currentHTML); } catch(e) { console.warn('Design context skipped:', e); }
-            addChatMessageNew('assistant', '✅ HTML loaded! Click on any element to select it, then tell me what to change.');
+            addChatMessageNew('assistant', 'HTML loaded! Click on any element to select it, then tell me what to change.');
         }
 
         async function importFromUrl() {
@@ -4416,7 +4416,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
 
                     // Extract domain for display
                     const domain = new URL(data.url).hostname;
-                    addChatMessageNew('assistant', `✅ Imported ${domain}! Click on any element to select it, then tell me what to change.`);
+                    addChatMessageNew('assistant', `Imported ${domain}! Click on any element to select it, then tell me what to change.`);
                     showToast('Website imported successfully!', 'success');
                 } else {
                     showToast(data.error || 'Failed to import website', 'error');
@@ -4458,7 +4458,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
             input.value = '';
 
             // Show loading
-            const loadingMsg = addChatMessageNew('assistant', '⏳ Working on it...');
+            const loadingMsg = addChatMessageNew('assistant', 'Working on it...');
 
             try {
                 if (currentHTML && currentHTML.length > 100) {
@@ -4511,25 +4511,25 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                             showBeforeAfterComparison(beforeHTML, currentHTML, data.summary || 'Edit applied', loadingMsg);
                         } else {
                             console.warn('Edit returned same HTML - no change detected');
-                            loadingMsg.querySelector('.chat-message-content').textContent = '⚠️ No changes detected. Try being more specific about what to change.';
+                            loadingMsg.querySelector('.chat-message-content').textContent = 'No changes detected. Try being more specific about what to change.';
                         }
                     } else {
                         console.error('Edit failed:', data.error);
-                        loadingMsg.querySelector('.chat-message-content').textContent = `❌ ${data.error || 'Edit failed - try again'}`;
+                        loadingMsg.querySelector('.chat-message-content').textContent = `${data.error || 'Edit failed - try again'}`;
                     }
                 } else {
-                    loadingMsg.querySelector('.chat-message-content').textContent = '💡 Generate a website first, then I can help you edit it!';
+                    loadingMsg.querySelector('.chat-message-content').textContent = 'Generate a website first, then I can help you edit it!';
                 }
             } catch (error) {
                 console.error('Edit error:', error);
-                loadingMsg.querySelector('.chat-message-content').textContent = `❌ Error: ${error.message}`;
+                loadingMsg.querySelector('.chat-message-content').textContent = `Error: ${error.message}`;
             }
         }
 
         async function generateWebsiteNew() {
             const username = document.getElementById('usernameNew').value.trim();
             if (!username) {
-                addChatMessageNew('assistant', '⚠️ Please enter a Topmate username');
+                addChatMessageNew('assistant', 'Please enter a Topmate username');
                 return;
             }
 
@@ -4537,7 +4537,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
             document.getElementById('welcomeScreenNew').style.display = 'none';
 
             addChatMessageNew('user', `Generate website for @${username}`);
-            const loadingMsg = addChatMessageNew('assistant', '🚀 Building your website...');
+            const loadingMsg = addChatMessageNew('assistant', 'Building your website...');
 
             try {
                 const response = await fetch(`${AI_BASE}/api/build/website`, {
@@ -4557,13 +4557,13 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                     document.getElementById('previewUrl').textContent = `${username}.topmate.io`;
                     updatePreviewFrameNew(currentHTML);
                     try { if (typeof extractDesignContext === 'function') extractDesignContext(currentHTML); } catch(e) { console.warn('Design context skipped:', e); }
-                    loadingMsg.querySelector('.chat-message-content').textContent = '✅ Website created! Click on any element to select it, then tell me what to change.';
+                    loadingMsg.querySelector('.chat-message-content').textContent = 'Website created! Click on any element to select it, then tell me what to change.';
                 } else {
-                    loadingMsg.querySelector('.chat-message-content').textContent = `❌ ${data.error || 'Failed to generate'}`;
+                    loadingMsg.querySelector('.chat-message-content').textContent = `${data.error || 'Failed to generate'}`;
                     document.getElementById('welcomeScreenNew').style.display = 'flex';
                 }
             } catch (error) {
-                loadingMsg.querySelector('.chat-message-content').textContent = `❌ Error: ${error.message}`;
+                loadingMsg.querySelector('.chat-message-content').textContent = `Error: ${error.message}`;
                 document.getElementById('welcomeScreenNew').style.display = 'flex';
             }
         }
@@ -4579,7 +4579,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                 document.getElementById('welcomeScreenNew').style.display = 'none';
                 updatePreviewFrameNew(currentHTML);
                 try { if (typeof extractDesignContext === 'function') extractDesignContext(currentHTML); } catch(e) { console.warn('Design context skipped:', e); }
-                addChatMessageNew('assistant', '✅ HTML uploaded! Click on any element to select it, then tell me what to change.');
+                addChatMessageNew('assistant', 'HTML uploaded! Click on any element to select it, then tell me what to change.');
             };
             reader.readAsText(file);
         }
@@ -4665,7 +4665,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                     } else {
                         const selectedText = e.target.textContent?.substring(0, 50) || e.target.tagName;
                         const tagName = e.target.tagName.toLowerCase();
-                        const msgEl = addChatMessageNew('assistant', `📍 Selected <strong>${tagName}</strong>: "${selectedText}${selectedText.length >= 50 ? '...' : ''}"<br><span style="color: #b0b0b0; font-size: 12px;">Tell me what changes you'd like to make.</span>`);
+                        const msgEl = addChatMessageNew('assistant', `Selected <strong>${tagName}</strong>: "${selectedText}${selectedText.length >= 50 ? '...' : ''}"<br><span style="color: #b0b0b0; font-size: 12px;">Tell me what changes you'd like to make.</span>`);
                         currentSelectionMsgId = msgEl?.id || null;
                     }
                 });
@@ -4819,7 +4819,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
             }
             addChatMessageNew('user', userMsg);
 
-            const loadingMsg = addChatMessageNew('assistant', '⏳ Applying changes...');
+            const loadingMsg = addChatMessageNew('assistant', 'Applying changes...');
 
             // Build instruction
             let instruction = '';
@@ -4865,10 +4865,10 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                     }
                     showBeforeAfterComparison(beforeHTML, currentHTML, summary, loadingMsg);
                 } else {
-                    loadingMsg.querySelector('.chat-message-content').innerHTML = '⚠️ Could not apply changes. Try using the chat instead.';
+                    loadingMsg.querySelector('.chat-message-content').innerHTML = 'Could not apply changes. Try using the chat instead.';
                 }
             } catch (error) {
-                loadingMsg.querySelector('.chat-message-content').innerHTML = `❌ Error: ${error.message}`;
+                loadingMsg.querySelector('.chat-message-content').innerHTML = `Error: ${error.message}`;
             }
         }
 
@@ -4879,7 +4879,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
 
             // Show loading in chat
             addChatMessageNew('user', `Change text: "${oldText.substring(0, 30)}..." → "${newText.substring(0, 30)}..."`);
-            const loadingMsg = addChatMessageNew('assistant', '⏳ Updating text...');
+            const loadingMsg = addChatMessageNew('assistant', 'Updating text...');
 
             try {
                 const response = await fetch(`${AI_BASE}/api/edit/optimized`, {
@@ -4906,10 +4906,10 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                     // Show before/after comparison
                     showBeforeAfterComparison(beforeHTML, currentHTML, `Changed text to "${newText.substring(0, 30)}..."`, loadingMsg);
                 } else {
-                    loadingMsg.querySelector('.chat-message-content').innerHTML = '⚠️ Could not update text. Try using the chat instead.';
+                    loadingMsg.querySelector('.chat-message-content').innerHTML = 'Could not update text. Try using the chat instead.';
                 }
             } catch (error) {
-                loadingMsg.querySelector('.chat-message-content').innerHTML = `❌ Error: ${error.message}`;
+                loadingMsg.querySelector('.chat-message-content').innerHTML = `Error: ${error.message}`;
             }
         }
 
@@ -4919,7 +4919,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
             const imgAlt = imgElement.alt || 'Selected image';
 
             const messageHtml = `
-                <div style="margin-bottom: 8px;">📍 Selected image:</div>
+                <div style="margin-bottom: 8px;">Selected image:</div>
                 <div style="display: inline-block; border-radius: 8px; overflow: hidden; margin-bottom: 8px;">
                     <img src="${imgSrc}" alt="${imgAlt}" style="max-width: 200px; max-height: 150px; border-radius: 6px; display: block; object-fit: contain;">
                 </div>
@@ -4937,7 +4937,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
             messageDiv.id = msgId;
             messageDiv.className = `chat-message ${role}`;
             messageDiv.innerHTML = `
-                <div class="chat-message-avatar">${role === 'user' ? '👤' : '🤖'}</div>
+                <div class="chat-message-avatar">${role === 'user' ? 'U' : 'AI'}</div>
                 <div class="chat-message-content">${htmlContent}</div>
             `;
             container.appendChild(messageDiv);
@@ -4958,7 +4958,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
             let previewingBefore = false;
 
             const comparisonHtml = `
-                <div style="margin-bottom: 12px; font-size: 13px;">✅ ${summary}</div>
+                <div style="margin-bottom: 12px; font-size: 13px;">${summary}</div>
                 <div style="display: flex; gap: 10px; margin-bottom: 12px;">
                     <div class="preview-card before-card" style="flex: 1; min-width: 0; cursor: pointer; padding: 8px; border-radius: 8px; border: 2px solid #333; background: #1e1e1e; transition: all 0.2s;">
                         <div style="font-size: 11px; color: #999; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Before</div>
@@ -4977,7 +4977,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                 </div>
                 <div style="display: flex; gap: 8px;">
                     <button class="revert-btn" style="flex: 1; padding: 10px 12px; background: #2a2a2a; color: #ccc; border: 1px solid #444; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.2s;">↩ Undo change</button>
-                    <button class="keep-btn" style="flex: 1; padding: 10px 12px; background: #667eea; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.2s;">✓ Keep change</button>
+                    <button class="keep-btn" style="flex: 1; padding: 10px 12px; background: #667eea; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.2s;">Keep change</button>
                 </div>
             `;
 
@@ -5073,7 +5073,7 @@ Use find_and_replace or modify_class to make these structural fixes.`,
                         // Confirm keeping the after version
                         currentHTML = afterHTML;
                         updatePreviewFrameNew(currentHTML);
-                        existingMsg.querySelector('.chat-message-content').innerHTML = `<div style="color: #10b981;">✓ ${summary}</div>`;
+                        existingMsg.querySelector('.chat-message-content').innerHTML = `<div style="color: #10b981;">${summary}</div>`;
                         showToast('Changes kept', 'success');
                     };
                 }
