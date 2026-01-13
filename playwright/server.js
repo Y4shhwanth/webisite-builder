@@ -9,7 +9,7 @@ const redis = require('redis');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const REDIS_URL = process.env.REDIS_URL || 'redis://redis:6379/0';
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379/0';
 
 app.use(express.json({ limit: '50mb' }));
 
@@ -25,6 +25,72 @@ async function initRedis() {
         console.warn('Redis connection failed, continuing without cache:', error.message);
         redisClient = null;
     }
+}
+
+/**
+ * Escape special characters in CSS selectors for Tailwind classes
+ * Handles: [] : / @ . and other special chars used in Tailwind
+ * Example: "h-[500px]" -> "h-\\[500px\\]"
+ * Example: "sm:w-auto" -> "sm\\:w-auto"
+ */
+function escapeCSSSelector(selector) {
+    if (!selector) return selector;
+
+    // Don't escape if it's a simple selector (tag name, simple class, or ID)
+    if (/^[a-zA-Z][a-zA-Z0-9]*$/.test(selector)) return selector;
+    if (/^#[a-zA-Z][a-zA-Z0-9_-]*$/.test(selector)) return selector;
+    if (/^\.[a-zA-Z][a-zA-Z0-9_-]*$/.test(selector)) return selector;
+
+    // Escape special characters used in Tailwind CSS
+    // Characters that need escaping in CSS selectors: [ ] : @ / ! % & * + = ~ ` ^ |
+    return selector
+        .replace(/\[/g, '\\[')
+        .replace(/\]/g, '\\]')
+        .replace(/:/g, '\\:')
+        .replace(/@/g, '\\@')
+        .replace(/\//g, '\\/')
+        .replace(/!/g, '\\!')
+        .replace(/%/g, '\\%')
+        .replace(/&/g, '\\&')
+        .replace(/\*/g, '\\*')
+        .replace(/\+/g, '\\+')
+        .replace(/=/g, '\\=')
+        .replace(/~/g, '\\~')
+        .replace(/`/g, '\\`')
+        .replace(/\^/g, '\\^')
+        .replace(/\|/g, '\\|');
+}
+
+/**
+ * Escape selector for use inside page.evaluate
+ * This handles the escaping needed for querySelector inside the browser context
+ */
+function escapeForBrowserSelector(selector) {
+    if (!selector) return selector;
+
+    // For complex selectors with combinators, escape each part separately
+    // Handle: > (child), space (descendant), + (adjacent sibling), ~ (general sibling)
+    const parts = selector.split(/(\s*>\s*|\s+|\s*\+\s*|\s*~\s*)/);
+
+    return parts.map((part, index) => {
+        // Skip combinators (odd indices are the separators)
+        if (index % 2 === 1) return part;
+
+        // Escape special characters in class names within this part
+        // Match class selectors and escape special chars in them
+        return part.replace(/\.([^\s.#>\+~\[]+)/g, (match, className) => {
+            // Escape Tailwind special chars in class name
+            const escaped = className
+                .replace(/\[/g, '\\[')
+                .replace(/\]/g, '\\]')
+                .replace(/:/g, '\\:')
+                .replace(/@/g, '\\@')
+                .replace(/\//g, '\\/')
+                .replace(/!/g, '\\!')
+                .replace(/%/g, '\\%');
+            return '.' + escaped;
+        });
+    }).join('');
 }
 
 // Health check
@@ -451,7 +517,9 @@ app.post('/edit-component', async (req, res) => {
             });
         }
 
-        console.log(`Editing component: ${selector} with ${edit_type}`);
+        // Escape Tailwind special characters in selector
+        const escapedSelector = escapeForBrowserSelector(selector);
+        console.log(`Editing component: ${selector} (escaped: ${escapedSelector}) with ${edit_type}`);
 
         const browser = await chromium.launch({
             headless: true,
@@ -526,7 +594,7 @@ app.post('/edit-component', async (req, res) => {
             } catch (e) {
                 return { success: false, error: e.message };
             }
-        }, { selector, editType: edit_type, editValue: edit_value });
+        }, { selector: escapedSelector, editType: edit_type, editValue: edit_value });
 
         if (!editResult.success) {
             await browser.close();
@@ -565,6 +633,9 @@ app.post('/get-element-visual-info', async (req, res) => {
                 error: 'Missing required fields: html, selector'
             });
         }
+
+        // Escape Tailwind special characters in selector
+        const escapedSelector = escapeForBrowserSelector(selector);
 
         const browser = await chromium.launch({
             headless: true,
@@ -608,7 +679,7 @@ app.post('/get-element-visual-info', async (req, res) => {
                     height: Math.round(rect.height)
                 }
             };
-        }, selector);
+        }, escapedSelector);
 
         await browser.close();
 
@@ -660,7 +731,9 @@ app.post('/screenshot', async (req, res) => {
 
         let screenshotBuffer;
         if (selector) {
-            const element = await page.$(selector);
+            // Escape Tailwind special characters in selector
+            const escapedSelector = escapeForBrowserSelector(selector);
+            const element = await page.$(escapedSelector);
             if (element) {
                 screenshotBuffer = await element.screenshot({ type: 'png' });
             } else {
@@ -717,6 +790,9 @@ app.post('/get-element', async (req, res) => {
         const page = await browser.newPage();
         await page.setContent(html);
 
+        // Escape Tailwind special characters in selector
+        const escapedSelector = escapeForBrowserSelector(selector);
+
         const elementData = await page.evaluate((sel) => {
             const element = document.querySelector(sel);
             if (!element) {
@@ -729,7 +805,7 @@ app.post('/get-element', async (req, res) => {
                 id: element.id,
                 classes: Array.from(element.classList)
             };
-        }, selector);
+        }, escapedSelector);
 
         await browser.close();
 
@@ -917,12 +993,36 @@ app.post('/fetch-url', async (req, res) => {
     }
 });
 
+// Global error handlers for unhandled rejections and exceptions
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    // Don't exit - just log the error
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    // Don't exit immediately - allow graceful shutdown
+    setTimeout(() => {
+        process.exit(1);
+    }, 1000);
+});
+
 // Start server
 async function start() {
     await initRedis();
 
-    app.listen(PORT, '0.0.0.0', () => {
+    const server = app.listen(PORT, '0.0.0.0', () => {
         console.log(`Playwright HTML Editor running on port ${PORT}`);
+        console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    });
+
+    // Graceful shutdown
+    process.on('SIGTERM', () => {
+        console.log('SIGTERM received. Shutting down gracefully...');
+        server.close(() => {
+            console.log('Server closed');
+            process.exit(0);
+        });
     });
 }
 

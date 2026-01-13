@@ -782,6 +782,7 @@ Make your best judgment based on this visual context.
                 if self.selected_element:
                     selected_selector = self.selected_element.get("selector", "")
                     selected_classes = self.selected_element.get("classes", [])
+                    color_classes = self.selected_element.get("color_classes", [])
 
                     # If AI is trying to edit body/html but user selected something specific, override
                     if selector in ["body", "html", "main", ""] or not selector:
@@ -792,6 +793,21 @@ Make your best judgment based on this visual context.
                     elif old_class and selected_classes and old_class in " ".join(selected_classes):
                         selector = selected_selector
                         logger.info(f"EditingAgent: modify_class - old_class found in selected element, using: '{selector}'")
+
+                    # SMART BACKGROUND COLOR DETECTION: If changing bg-* class but old_class not specified correctly
+                    # Auto-detect the current bg-* class from color_classes
+                    if new_class.startswith("bg-") and color_classes:
+                        current_bg_class = None
+                        for cc in color_classes:
+                            if cc.startswith("bg-"):
+                                current_bg_class = cc
+                                break
+
+                        # If old_class doesn't match any bg class but we found one, use it
+                        if current_bg_class and old_class != current_bg_class:
+                            if not old_class or old_class not in " ".join(selected_classes):
+                                logger.info(f"EditingAgent: modify_class - AUTO-DETECTED bg class: '{current_bg_class}' -> '{new_class}'")
+                                old_class = current_bg_class
 
                 # Get outer_html for precise targeting (most reliable method)
                 outer_html = self.selected_element.get("outer_html", "") if self.selected_element else ""
@@ -936,6 +952,34 @@ Make your best judgment based on this visual context.
                         "html": modified_html,
                         "message": f"WARNING: Changed ALL '{old_class}' to '{new_class}' globally (targeted methods failed)"
                     }
+
+                # FALLBACK: If we're trying to add a bg/text/border class but couldn't find old_class,
+                # try to ADD the new class to the selected element instead
+                if self.selected_element and new_class and (
+                    new_class.startswith("bg-") or
+                    new_class.startswith("text-") or
+                    new_class.startswith("border-")
+                ):
+                    outer_html = self.selected_element.get("outer_html", "")
+                    if outer_html and 'class="' in outer_html:
+                        # Find the class attribute and add the new class to it
+                        import re
+                        class_match = re.search(r'class="([^"]*)"', outer_html)
+                        if class_match:
+                            current_classes = class_match.group(1)
+                            new_classes = f"{current_classes} {new_class}"
+                            new_outer_html = outer_html.replace(f'class="{current_classes}"', f'class="{new_classes}"')
+
+                            if outer_html in self.current_html:
+                                modified_html = self.current_html.replace(outer_html, new_outer_html, 1)
+                                if modified_html != self.current_html:
+                                    self.current_html = modified_html
+                                    logger.info(f"EditingAgent: modify_class - ADDED '{new_class}' (element had no {old_class})")
+                                    return {
+                                        "success": True,
+                                        "html": modified_html,
+                                        "message": f"Added class '{new_class}' to element ('{old_class}' was not present)"
+                                    }
 
                 logger.info(f"EditingAgent: modify_class FAILED - class '{old_class}' not found anywhere")
                 return {"success": False, "error": f"Class '{old_class}' not found in HTML"}

@@ -2,15 +2,23 @@
 Configuration settings for AI Engine
 """
 import os
+import logging
 from typing import Optional
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
 load_dotenv()
 
+# Configure basic logger for config module
+logger = logging.getLogger(__name__)
+
 
 class Settings(BaseSettings):
     """Application settings"""
+
+    # Environment
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+    DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
 
     # API Keys
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
@@ -20,17 +28,17 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL",
-        "postgresql://postgres:postgres@postgres:5432/website_builder"
+        "postgresql://postgres:postgres@localhost:5432/website_builder"
     )
 
-    # Redis
-    REDIS_URL: str = os.getenv("REDIS_URL", "redis://redis:6379/0")
+    # Redis - default to localhost for local development
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     REDIS_ENABLED: bool = True
 
-    # External Services
+    # External Services - default to localhost for local development
     PLAYWRIGHT_SERVICE_URL: str = os.getenv(
         "PLAYWRIGHT_SERVICE_URL",
-        "http://playwright:3001"
+        "http://localhost:3001"
     )
     TOPMATE_API_URL: str = os.getenv(
         "TOPMATE_API_URL",
@@ -74,6 +82,12 @@ class Settings(BaseSettings):
     # File paths
     GENERATED_WEBSITES_DIR: str = "/app/generated_websites"
 
+    # CORS - comma-separated list of allowed origins
+    CORS_ORIGINS: str = os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000,http://127.0.0.1:8080"
+    )
+
     class Config:
         env_file = ".env"
         case_sensitive = True
@@ -100,6 +114,23 @@ def get_redis_client():
         client.ping()
         return client
     except Exception as e:
-        print(f"Redis connection failed: {e}. Continuing without cache.")
+        logger.warning(f"Redis connection failed: {e}. Continuing without cache.")
         settings.REDIS_ENABLED = False
         return None
+
+
+def validate_required_config():
+    """Validate required configuration on startup"""
+    errors = []
+
+    # Check for at least one AI API key
+    if not settings.ANTHROPIC_API_KEY and not settings.OPENROUTER_API_KEY:
+        errors.append("Either ANTHROPIC_API_KEY or OPENROUTER_API_KEY must be configured")
+
+    if errors:
+        for error in errors:
+            logger.error(f"Configuration error: {error}")
+        if settings.ENVIRONMENT == "production":
+            raise ValueError(f"Missing required configuration: {', '.join(errors)}")
+
+    return len(errors) == 0

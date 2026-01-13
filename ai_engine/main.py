@@ -12,7 +12,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-from config import settings, get_redis_client
+from config import settings, get_redis_client, validate_required_config
 from logging_config import logger
 
 # Import routers
@@ -26,7 +26,10 @@ limiter = Limiter(key_func=get_remote_address)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
-    logger.info("Starting AI Engine", environment=settings.SENTRY_ENVIRONMENT)
+    logger.info("Starting AI Engine", environment=settings.ENVIRONMENT)
+
+    # Validate required configuration
+    validate_required_config()
 
     # Initialize Sentry if DSN provided
     if settings.SENTRY_DSN:
@@ -74,23 +77,32 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS middleware - Allow Vercel frontend and localhost for development
+# CORS middleware - Configure from environment
+# Parse CORS_ORIGINS from comma-separated string
 ALLOWED_ORIGINS = [
-    "https://webisite-builder.vercel.app",
-    "https://*.vercel.app",
-    "http://localhost:8080",
-    "http://localhost:3000",
-    "http://127.0.0.1:8080",
-    "http://127.0.0.1:3000",
+    origin.strip()
+    for origin in settings.CORS_ORIGINS.split(",")
+    if origin.strip()
 ]
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for now (Render free tier)
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# In development, allow all origins for easier testing
+# In production, use the configured allowed origins only
+if settings.ENVIRONMENT == "development" or settings.DEBUG:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,  # Cannot use credentials with wildcard origins
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=ALLOWED_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
 @app.get("/")
@@ -215,4 +227,6 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001, reload=True)
+    # Only enable reload in development
+    reload_enabled = settings.ENVIRONMENT == "development" or settings.DEBUG
+    uvicorn.run(app, host="0.0.0.0", port=8001, reload=reload_enabled)
